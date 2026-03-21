@@ -35,6 +35,7 @@ export class CommandParser {
     this.onStartRecording = null;
     this.onShowAlternatives = null;
     this.onToggleAIPanel = null;
+    this.onNewSession = null;
   }
 
   pushUndo() {
@@ -206,6 +207,9 @@ export class CommandParser {
     }
     if (t === 'toggle ai panel' || t === 'ai panel') {
       this.onToggleAIPanel?.(); this._flash('AI PANEL'); return true;
+    }
+    if (t === 'new session') {
+      this.onNewSession?.(); this._flash('NEW SESSION'); return true;
     }
 
     // Template selection

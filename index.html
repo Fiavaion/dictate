@@ -74,24 +74,28 @@
     <div class="cmd-item"><div class="cmd-phrase">"go to beginning" / "go to end"</div><div class="cmd-desc">scroll transcript</div></div>
     <div class="cmd-item"><div class="cmd-phrase">"stop listening" / "start listening"</div><div class="cmd-desc">toggle recording</div></div>
     <div class="cmd-item"><div class="cmd-phrase">"toggle AI panel"</div><div class="cmd-desc">show/hide AI sidebar</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"new session"</div><div class="cmd-desc">save current & start fresh</div></div>
   </div>
 </div>
 
 <!-- ══════ Main App ══════ -->
-<div class="app ai-panel-open" id="app">
+<div class="app" id="app">
 
   <!-- HEADER -->
   <header>
-    <div class="logo">FIAVAION<span>.</span>DICTATE</div>
-    <div class="header-right">
-      <div class="vu-meter" id="vuMeter"></div>
-      <div class="status-pill" id="statusPill"><div class="dot"></div><span id="statusText">READY</span></div>
-
-      <div class="ai-status" id="aiStatusBadge">
-        <div class="ai-dot"></div>
-        <span class="ai-label">OFFLINE</span>
+    <div class="header-row-1">
+      <div class="logo">FIAVAION<span>.</span>DICTATE</div>
+      <div class="header-status">
+        <div class="vu-meter" id="vuMeter"></div>
+        <div class="status-pill" id="statusPill"><div class="dot"></div><span id="statusText">READY</span></div>
+        <div class="ai-status" id="aiStatusBadge">
+          <div class="ai-dot"></div>
+          <span class="ai-label">OFFLINE</span>
+        </div>
       </div>
+    </div>
 
+    <div class="header-row-2">
       <div class="project-selector" id="projectSelectorWrap">
         <select class="ui-select" id="projectSelect">
           <option value="">— Project —</option>
@@ -102,18 +106,26 @@
         </button>
       </div>
 
-      <select class="ui-select" id="langSelect">
-        <option value="en-US">EN-US</option>
-        <option value="en-GB">EN-GB</option>
-        <option value="en-IE">EN-IE</option>
-        <option value="fr-FR">FR</option>
-        <option value="de-DE">DE</option>
-        <option value="es-ES">ES</option>
-        <option value="it-IT">IT</option>
-        <option value="pt-BR">PT</option>
-        <option value="ja-JP">JA</option>
-        <option value="zh-CN">ZH</option>
+      <div class="session-selector" id="sessionSelectorWrap">
+        <input class="session-search" id="sessionSearch" type="text" placeholder="Search sessions…">
+        <select class="ui-select" id="sessionSelect">
+          <option value="__new__">+ New Session</option>
+        </select>
+        <button class="btn-sort" id="btnDeleteSession" title="Delete session">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+        <button class="btn-sort" id="btnExportSessions" title="Export sessions">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button class="btn-sort" id="btnImportSessions" title="Import sessions">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+
+      <select class="ui-select lang-select" id="langSelect" style="display:none">
+        <option value="en-GB" selected>EN-GB</option>
       </select>
+      <select class="ui-select voice-select" id="voiceSelect"></select>
 
       <div class="model-selector">
         <select class="ui-select" id="modelSelect">
@@ -128,7 +140,10 @@
     <!-- Raw dictation pane -->
     <div class="pane-header">
       <div class="pane-label">RAW DICTATION</div>
-      <button class="pane-copy-btn" onclick="copyRaw()" title="Copy raw text">COPY</button>
+      <div class="pane-actions">
+        <button class="pane-copy-btn" onclick="readPane('raw')" title="Read aloud">READ</button>
+        <button class="pane-copy-btn" onclick="copyRaw()" title="Copy raw text">COPY</button>
+      </div>
     </div>
     <div class="pane-wrapper raw-pane">
       <div class="transcript-scroll" id="rawScroll">
@@ -144,7 +159,10 @@
     <!-- Refined output pane -->
     <div class="pane-header">
       <div class="pane-label refined" id="refinedLabel">AI-CORRECTED OUTPUT</div>
-      <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
+      <div class="pane-actions">
+        <button class="pane-copy-btn" onclick="readPane('refined')" title="Read aloud">READ</button>
+        <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
+      </div>
     </div>
     <div class="pane-wrapper refined-pane">
       <div class="transcript-scroll" id="refinedScroll">
@@ -157,33 +175,21 @@
 
   <!-- AI SIDEBAR -->
   <div class="ai-sidebar" id="aiSidebar">
-    <!-- Corrections -->
-    <div>
-      <div class="ai-section-title">CORRECTIONS</div>
-      <div class="correction-list" id="correctionList">
+    <!-- Corrections (collapsible) -->
+    <div class="corrections-compact">
+      <div class="corrections-compact-header" onclick="toggleCorrections()">
+        <span class="ai-section-title corrections-title">CORRECTIONS</span>
+        <span class="corrections-count" id="correctionCount">0</span>
+      </div>
+      <div class="correction-list corrections-collapsed" id="correctionList">
         <div class="correction-empty">No corrections yet</div>
       </div>
     </div>
-
-    <!-- Template selector -->
-    <div>
-      <div class="ai-section-title">PROMPT TEMPLATE</div>
-      <div class="template-selector" id="templateSelector"></div>
-    </div>
-
 
     <!-- Settings -->
     <div>
       <div class="ai-section-title">AI SETTINGS</div>
       <div class="ai-settings">
-        <div class="ai-setting-row">
-          <span class="ai-setting-label">Auto-correct</span>
-          <label class="toggle">
-            <input type="checkbox" id="aiToggle" checked>
-            <div class="toggle-track"></div>
-            <div class="toggle-thumb"></div>
-          </label>
-        </div>
         <input class="ai-context-input" id="projectContext" placeholder="Project name (e.g. BugHive)" type="text">
         <input class="ai-context-input" id="stackContext" placeholder="Tech stack (e.g. Node.js, Express, SQLite)" type="text">
       </div>
@@ -192,7 +198,7 @@
 
   <!-- FOOTER -->
   <footer>
-    <div class="controls-row">
+    <div class="footer-row-1">
       <button class="btn-mic" id="btnMic" onclick="toggleRecording()">
         <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
@@ -204,16 +210,22 @@
       </button>
       <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
       <button class="btn-secondary" onclick="toggleCmdPanel()">COMMANDS</button>
-      <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">AI PANEL</button>
+      <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
       <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
 
-      <span class="kbd-hint">
-        <kbd>SPACE</kbd> toggle &nbsp;&middot;&nbsp;
-        <kbd>ESC</kbd> stop &nbsp;&middot;&nbsp;
-        <kbd>Ctrl+Shift+A</kbd> AI panel &nbsp;&middot;&nbsp;
-        <kbd>Ctrl+Shift+S</kbd> structure &nbsp;&middot;&nbsp;
-        <kbd>Ctrl+Shift+V</kbd> copy to Claude
-      </span>
+      <div class="footer-templates">
+        <span class="footer-template-label">TEMPLATE</span>
+        <div class="template-selector" id="templateSelector"></div>
+      </div>
+
+      <label class="footer-toggle" title="Auto-correct">
+        <span class="footer-toggle-label">AI</span>
+        <label class="toggle">
+          <input type="checkbox" id="aiToggle" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </label>
 
       <div class="copy-group">
         <button class="btn-copy" id="btnCopy" onclick="copyRefined()">COPY</button>
@@ -259,6 +271,7 @@
   </div>
 </div>
 
+<input type="file" id="importFileInput" accept=".json" style="display:none">
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -64,6 +64,14 @@
   transform: translateX(18px);
 }
 
+/* Voice selector */
+.ai-voice-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6rem !important;
+  padding: 4px 6px !important;
+}
+
 /* Project context inputs */
 .ai-context-input {
   width: 100%;

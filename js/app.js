@@ -12,7 +12,9 @@ import { CorrectionPipeline } from './ai/correction-pipeline.js';
 import { PromptStructurer } from './ai/prompt-structurer.js';
 import { getAllTemplates } from './ai/prompt-templates.js';
 import { copyToClipboard } from './utils/clipboard.js';
-import { saveSession, loadSession, clearSession, saveSettings, loadSettings } from './utils/persistence.js';
+import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
+  loadSessionsIndex, saveSessionToList, loadSavedSession, deleteSessionFromList,
+  renameSession, exportSessions, importSessions } from './utils/persistence.js';
 import { fetchProjects, sortByModified, sortByName, saveProjectSettings, loadProjectSettings } from './utils/projects.js';
 
 // ══════════════════════════════════════════
@@ -32,6 +34,8 @@ const state = {
   autoSaveTimer: null,
   structureView: false,
   serverAvailable: true,
+  currentSessionId: null,
+  sessionListSaveTimer: null,
 };
 
 // ══════════════════════════════════════════
@@ -354,6 +358,7 @@ commandParser.onAISetTemplate = (name) => {
 commandParser.onAIShowDiff = () => toggleDiffView();
 commandParser.onAIReadBack = () => readBack();
 commandParser.onToggleAIPanel = () => toggleAIPanel();
+commandParser.onNewSession = () => startNewSession();
 commandParser.onAIIgnoreLast = () => {
   // Remove last correction segment, use raw instead
   if (correctionPipeline.correctedSegments.length > 0) {
@@ -484,12 +489,15 @@ function toggleRecording() {
 }
 
 function clearAll() {
+  saveCurrentSessionToList();
+
   stopRecording();
   state.rawTranscript = '';
   state.interimTranscript = '';
   state.structuredPrompt = '';
   state.sessionStart = null;
   state.lastConfidence = 0;
+  state.currentSessionId = null;
   commandParser.reset();
   correctionPipeline.reset();
   $('cmdCount').textContent = '0';
@@ -511,6 +519,11 @@ function clearAll() {
   ph.id = 'placeholder';
   ph.textContent = 'Press SPACE or click START to begin dictating\u2026';
   el.appendChild(ph);
+
+  const settings = loadSettings();
+  settings.currentSessionId = null;
+  saveSettings(settings);
+  renderSessionSelector();
 }
 
 // ══════════════════════════════════════════
@@ -602,7 +615,27 @@ function renderCorrections(diffs) {
   while (list.children.length > 20) {
     list.removeChild(list.firstChild);
   }
+
+  // Update count badge
+  const countEl = $('correctionCount');
+  if (countEl) {
+    const count = list.querySelectorAll('.correction-item').length;
+    countEl.textContent = count;
+    countEl.classList.toggle('has-corrections', count > 0);
+  }
+  // Auto-expand when corrections arrive
+  if (diffs.length > 0) {
+    list.classList.remove('corrections-collapsed');
+    list.classList.add('corrections-expanded');
+  }
 }
+
+function toggleCorrections() {
+  const list = $('correctionList');
+  list.classList.toggle('corrections-collapsed');
+  list.classList.toggle('corrections-expanded');
+}
+window.toggleCorrections = toggleCorrections;
 
 // ══════════════════════════════════════════
 // Status & Stats
@@ -709,15 +742,101 @@ async function doStructure() {
   await promptStructurer.structure(text);
 }
 
+// ── TTS Voice ──
+const TTS_DEFAULT_VOICE = 'Google UK English Female';
+
+function getSelectedVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const sel = $('voiceSelect');
+  const name = sel ? sel.value : (loadSettings().ttsVoice || TTS_DEFAULT_VOICE);
+  const voices = speechSynthesis.getVoices();
+  return voices.find(v => v.name === name) || null;
+}
+
+function populateVoiceSelector() {
+  const sel = $('voiceSelect');
+  if (!sel || !('speechSynthesis' in window)) return;
+  const voices = speechSynthesis.getVoices();
+  if (voices.length === 0) return;
+  const saved = loadSettings().ttsVoice || '';
+  sel.innerHTML = '';
+  // Default placeholder option
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Choose voice\u2026';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.hidden = true;
+  sel.appendChild(placeholder);
+  for (const v of voices) {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = v.name + (v.lang ? ` (${v.lang})` : '');
+    if (v.name === saved) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  // Auto-select default if nothing saved or saved voice not found
+  if (!saved || !voices.find(v => v.name === saved)) {
+    const preferred = voices.find(v => v.name === TTS_DEFAULT_VOICE)
+      || voices.find(v => v.name.toLowerCase().includes('uk english female'))
+      || voices.find(v => v.name.toLowerCase().includes('english') && v.name.toLowerCase().includes('female'));
+    if (preferred) {
+      sel.value = preferred.name;
+      const s = loadSettings();
+      s.ttsVoice = preferred.name;
+      saveSettings(s);
+    }
+  }
+  sel.onchange = () => {
+    const s = loadSettings();
+    s.ttsVoice = sel.value;
+    saveSettings(s);
+  };
+}
+
+function initVoiceSelector() {
+  if (!('speechSynthesis' in window)) return;
+  populateVoiceSelector();
+  // Chrome loads voices asynchronously
+  speechSynthesis.onvoiceschanged = () => populateVoiceSelector();
+}
+
 function readBack() {
   const text = correctionPipeline.correctedText || state.rawTranscript;
   if (!text.trim()) { flashCmd('NOTHING TO READ'); return; }
   if ('speechSynthesis' in window) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.9;
+    const voice = getSelectedVoice();
+    if (voice) utterance.voice = voice;
     speechSynthesis.speak(utterance);
   }
 }
+
+function readPane(pane) {
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+
+  let text = '';
+  if (pane === 'raw') {
+    text = state.rawTranscript;
+  } else {
+    text = (state.structureView && state.structuredPrompt)
+      ? state.structuredPrompt
+      : (correctionPipeline.correctedText || state.rawTranscript);
+  }
+
+  if (!text || !text.trim()) { flashCmd('NOTHING TO READ'); return; }
+  if (!('speechSynthesis' in window)) { flashCmd('TTS NOT SUPPORTED'); return; }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.9;
+  const voice = getSelectedVoice();
+  if (voice) utterance.voice = voice;
+  flashCmd('READING ' + (pane === 'raw' ? 'RAW' : 'REFINED'));
+  speechSynthesis.speak(utterance);
+  utterance.onend = () => flashCmd('DONE READING');
+}
+window.readPane = readPane;
 
 // ══════════════════════════════════════════
 // Pane copy
@@ -855,6 +974,12 @@ function autoSave() {
       template: promptStructurer.currentTemplate,
       lang: $('langSelect').value,
     });
+    // Also persist to sessions list with a longer debounce
+    clearTimeout(state.sessionListSaveTimer);
+    state.sessionListSaveTimer = setTimeout(() => {
+      saveCurrentSessionToList();
+      renderSessionSelector();
+    }, 8000);
   }, 2000);
 }
 
@@ -877,6 +1002,228 @@ function restoreSession() {
   renderTemplateSelector();
 
   return true;
+}
+
+// ══════════════════════════════════════════
+// Saved Sessions
+// ══════════════════════════════════════════
+let sessionSearchQuery = '';
+
+function isToday(date) {
+  const now = new Date();
+  return date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+}
+
+function renderSessionSelector() {
+  const select = $('sessionSelect');
+  if (!select) return;
+  const sessions = loadSessionsIndex();
+
+  select.innerHTML = '';
+
+  // "+ New Session" option
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__';
+  newOpt.textContent = '+ New Session';
+  select.appendChild(newOpt);
+
+  // Filter by search query
+  const query = sessionSearchQuery.toLowerCase().trim();
+  const filtered = query
+    ? sessions.filter(s =>
+        s.title.toLowerCase().includes(query) ||
+        (s.project && s.project.toLowerCase().includes(query)))
+    : sessions;
+
+  if (filtered.length > 0) {
+    const divider = document.createElement('option');
+    divider.disabled = true;
+    divider.textContent = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500';
+    select.appendChild(divider);
+  }
+
+  for (const s of filtered) {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    const date = new Date(s.updatedAt);
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = isToday(date) ? 'Today' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const projectTag = s.project ? ` [${s.project}]` : '';
+    opt.textContent = `${s.title}${projectTag} \u2014 ${dateStr} ${timeStr} (${s.wordCount}w)`;
+    if (s.id === state.currentSessionId) opt.selected = true;
+    select.appendChild(opt);
+  }
+
+  if (!state.currentSessionId) select.value = '__new__';
+}
+
+function saveCurrentSessionToList() {
+  const raw = state.rawTranscript.trim();
+  if (!raw) return;
+  const settings = loadSettings();
+  const data = {
+    rawTranscript: state.rawTranscript,
+    refinedTranscript: correctionPipeline.correctedText || '',
+    structuredPrompt: state.structuredPrompt,
+    corrections: correctionPipeline.corrections.slice(-50),
+    template: promptStructurer.currentTemplate,
+    lang: $('langSelect').value,
+    project: settings.activeProject || '',
+  };
+  state.currentSessionId = saveSessionToList(state.currentSessionId, data);
+  settings.currentSessionId = state.currentSessionId;
+  saveSettings(settings);
+}
+
+function onSessionSelected(value) {
+  if (value === '__new__') { startNewSession(); return; }
+
+  saveCurrentSessionToList();
+
+  const session = loadSavedSession(value);
+  if (!session) {
+    flashCmd('SESSION NOT FOUND');
+    renderSessionSelector();
+    return;
+  }
+
+  if (state.isRecording) stopRecording();
+
+  state.currentSessionId = value;
+  state.rawTranscript = session.rawTranscript || '';
+  state.structuredPrompt = session.structuredPrompt || '';
+  state.interimTranscript = '';
+  state.sessionStart = null;
+
+  if (session.lang) $('langSelect').value = session.lang;
+  if (session.template) promptStructurer.setTemplate(session.template);
+
+  correctionPipeline.reset();
+  if (session.refinedTranscript) {
+    correctionPipeline.correctedSegments = [session.refinedTranscript];
+  }
+
+  renderTranscript();
+  renderRefined(session.refinedTranscript || '');
+  if (session.structuredPrompt && state.structureView) {
+    $('refinedContent').innerHTML = escapeHtml(session.structuredPrompt).replace(/\n/g, '<br>');
+  }
+  renderCorrections([]);
+  updateStats();
+  renderTemplateSelector();
+  renderSessionSelector();
+
+  const settings = loadSettings();
+  settings.currentSessionId = value;
+  saveSettings(settings);
+
+  flashCmd('SESSION LOADED');
+}
+
+function startNewSession() {
+  saveCurrentSessionToList();
+
+  if (state.isRecording) stopRecording();
+  state.rawTranscript = '';
+  state.interimTranscript = '';
+  state.structuredPrompt = '';
+  state.sessionStart = null;
+  state.lastConfidence = 0;
+  state.currentSessionId = null;
+  commandParser.reset();
+  correctionPipeline.reset();
+  $('cmdCount').textContent = '0';
+  $('sessionTime').textContent = '0:00';
+  updateStats();
+  updateConfidence(0);
+  renderTranscript();
+  state.structureView = false;
+  $('refinedLabel').textContent = 'AI-CORRECTED OUTPUT';
+  $('refinedLabel').classList.remove('structured');
+  renderRefined('');
+  renderCorrections([]);
+  clearSession();
+
+  const el = $('rawContent');
+  el.innerHTML = '';
+  const ph = document.createElement('span');
+  ph.className = 'placeholder';
+  ph.id = 'placeholder';
+  ph.textContent = 'Press SPACE or click START to begin dictating\u2026';
+  el.appendChild(ph);
+
+  const settings = loadSettings();
+  settings.currentSessionId = null;
+  saveSettings(settings);
+
+  renderSessionSelector();
+  flashCmd('NEW SESSION');
+}
+
+function onDeleteSession() {
+  if (!state.currentSessionId) {
+    flashCmd('NO SESSION TO DELETE');
+    return;
+  }
+  deleteSessionFromList(state.currentSessionId);
+  state.currentSessionId = null;
+  const settings = loadSettings();
+  settings.currentSessionId = null;
+  saveSettings(settings);
+  renderSessionSelector();
+  flashCmd('SESSION DELETED');
+}
+
+function onRenameSession() {
+  if (!state.currentSessionId) {
+    flashCmd('NO SESSION TO RENAME');
+    return;
+  }
+  const index = loadSessionsIndex();
+  const entry = index.find(s => s.id === state.currentSessionId);
+  const current = entry ? entry.title : '';
+  const newTitle = prompt('Rename session:', current);
+  if (newTitle && newTitle.trim()) {
+    renameSession(state.currentSessionId, newTitle.trim());
+    renderSessionSelector();
+    flashCmd('SESSION RENAMED');
+  }
+}
+
+function onExportSessions() {
+  const json = exportSessions();
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `sessions-export-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  flashCmd('SESSIONS EXPORTED');
+}
+
+function onImportSessions() {
+  $('importFileInput').click();
+}
+
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const added = importSessions(reader.result);
+      renderSessionSelector();
+      flashCmd(`IMPORTED ${added} SESSION${added !== 1 ? 'S' : ''}`);
+    } catch {
+      flashCmd('IMPORT FAILED');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 }
 
 // ══════════════════════════════════════════
@@ -965,7 +1312,7 @@ async function detectServerMode() {
   hint.innerHTML = 'LOCAL SERVER';
   hint.title = 'Run server.py for project management & folder browsing';
   hint.onclick = showServerSetup;
-  $('app')?.querySelector('header .header-right')?.prepend(hint);
+  $('app')?.querySelector('header .header-row-2')?.prepend(hint);
 }
 
 function showServerSetup() {
@@ -1039,6 +1386,9 @@ function init() {
   if (settings.structureModel) promptStructurer.setModel(settings.structureModel);
   if (settings.aiEnabled === false) correctionPipeline.setEnabled(false);
 
+  // Restore session ID from settings
+  state.currentSessionId = settings.currentSessionId || null;
+
   // Restore session
   const restored = restoreSession();
   if (restored) flashCmd('SESSION RESTORED');
@@ -1046,8 +1396,11 @@ function init() {
   // Render template selector
   renderTemplateSelector();
 
-  // Start AI panel open by default
-  $('app').classList.add('ai-panel-open');
+  // Init TTS voice selector
+  initVoiceSelector();
+
+  // Start AI panel closed by default
+  state.aiPanelOpen = false;
 
   // Connect to Ollama
   ollamaClient.startMonitoring(10000, (connected, models) => {
@@ -1122,6 +1475,30 @@ function init() {
   $('btnBrowserSelect').onclick = selectBrowserFolder;
   $('folderModal').onclick = (e) => { if (e.target === $('folderModal')) closeFolderBrowser(); };
 
+  // Session selector
+  renderSessionSelector();
+  const sessionSelect = $('sessionSelect');
+  if (sessionSelect) {
+    sessionSelect.onchange = () => onSessionSelected(sessionSelect.value);
+    sessionSelect.ondblclick = () => onRenameSession();
+  }
+  $('btnDeleteSession')?.addEventListener('click', onDeleteSession);
+  $('btnExportSessions')?.addEventListener('click', onExportSessions);
+  $('btnImportSessions')?.addEventListener('click', onImportSessions);
+  $('importFileInput')?.addEventListener('change', handleImportFile);
+
+  // Session search filter
+  const sessionSearchInput = $('sessionSearch');
+  if (sessionSearchInput) {
+    sessionSearchInput.addEventListener('input', () => {
+      sessionSearchQuery = sessionSearchInput.value;
+      renderSessionSelector();
+    });
+  }
+
+  // Save session on tab close
+  window.addEventListener('beforeunload', () => saveCurrentSessionToList());
+
   // Load projects root path and project list (async — non-blocking)
   loadProjectsRoot();
   loadProjectSelector();
@@ -1145,6 +1522,11 @@ window.toggleCopyMenu = toggleCopyMenu;
 window.doStructure = doStructure;
 window.exitStructureView = exitStructureView;
 window.copyPaneContent = copyPaneContent;
+window.startNewSession = startNewSession;
+window.onDeleteSession = onDeleteSession;
+window.onRenameSession = onRenameSession;
+window.onExportSessions = onExportSessions;
+window.onImportSessions = onImportSessions;
 
 // Boot
 init();
