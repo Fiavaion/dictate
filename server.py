@@ -139,6 +139,42 @@ def get_projects():
     return results
 
 
+def scan_project(project_name):
+    """Walk project directory (max depth 4), return file list and stack info."""
+    root = get_projects_root() / project_name
+    if not root.is_dir():
+        return {"name": project_name, "stack": "", "files": []}
+
+    skip_dirs = {"node_modules", ".git", "dist", "build", "__pycache__", ".next",
+                 ".nuxt", "vendor", "target", ".venv", "venv", "coverage", ".cache"}
+    skip_ext = {".pyc", ".pyo", ".class", ".o", ".so", ".dll", ".exe", ".wasm",
+                ".map", ".min.js", ".min.css", ".lock", ".log"}
+
+    files = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        depth = len(pathlib.Path(dirpath).relative_to(root).parts)
+        if depth > 4:
+            dirnames.clear()
+            continue
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+        for fname in filenames:
+            if fname.startswith("."):
+                continue
+            ext = pathlib.Path(fname).suffix.lower()
+            if ext in skip_ext:
+                continue
+            rel = str(pathlib.Path(dirpath, fname).relative_to(root)).replace("\\", "/")
+            files.append(rel)
+        if len(files) > 500:
+            break
+
+    return {
+        "name": project_name,
+        "stack": detect_stack(root),
+        "files": files,
+    }
+
+
 def _ssl_context():
     ctx = ssl.create_default_context()
     return ctx
@@ -303,6 +339,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             else:
                 data["drives"] = get_drive_roots()
                 self._json_response(200, data)
+        elif parsed.path.startswith("/api/projects/") and parsed.path.endswith("/scan"):
+            project_name = urllib.parse.unquote(parsed.path[len("/api/projects/"):-len("/scan")])
+            self._json_response(200, scan_project(project_name))
         else:
             super().do_GET()
 
