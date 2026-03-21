@@ -13,6 +13,10 @@ CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
 PORT = 8080
 
 
+# ---------------------------------------------------------------------------
+# Config helpers
+# ---------------------------------------------------------------------------
+
 def _load_config():
     try:
         return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
@@ -38,6 +42,10 @@ def set_projects_root(path_str):
     _save_config(cfg)
     return True, str(p)
 
+
+# ---------------------------------------------------------------------------
+# Project helpers
+# ---------------------------------------------------------------------------
 
 def _read_pkg(path):
     try:
@@ -78,7 +86,6 @@ def detect_stack(project_path):
     if (p / "pom.xml").exists():      parts.append("Java/Maven")
     if (p / "build.gradle").exists(): parts.append("Java/Gradle")
 
-    # Dedupe preserving order
     seen = set()
     deduped = []
     for part in parts:
@@ -175,34 +182,43 @@ def scan_project(project_name):
     }
 
 
-def _ssl_context():
-    ctx = ssl.create_default_context()
-    return ctx
+# ---------------------------------------------------------------------------
+# Cloud AI proxy — forwards browser requests to provider APIs
+# ---------------------------------------------------------------------------
+
+_SSL_CTX = ssl.create_default_context()
 
 
-def _proxy_anthropic(api_key, model, prompt, system_prompt, stream, options):
-    body = {
+def _upstream_request(url, body_bytes, headers):
+    """Make an HTTPS request and return the http.client.HTTPResponse."""
+    req = urllib.request.Request(url, data=body_bytes, headers=headers)
+    return urllib.request.urlopen(req, context=_SSL_CTX, timeout=60)
+
+
+def _call_anthropic(api_key, model, prompt, system_prompt, stream, options):
+    """Call Anthropic Messages API. Returns (response_obj, provider_name)."""
+    body = json.dumps({
         "model": model,
         "system": system_prompt,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": options.get("maxTokens", 1024),
         "temperature": options.get("temperature", 0.1),
         "stream": stream,
-    }
-    req = urllib.request.Request(
+    }).encode()
+    return _upstream_request(
         "https://api.anthropic.com/v1/messages",
-        data=json.dumps(body).encode(),
-        headers={
+        body,
+        {
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         },
     )
-    return urllib.request.urlopen(req, context=_ssl_context())
 
 
-def _proxy_openai(api_key, model, prompt, system_prompt, stream, options):
-    body = {
+def _call_openai(api_key, model, prompt, system_prompt, stream, options):
+    """Call OpenAI Chat Completions API."""
+    body = json.dumps({
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -211,160 +227,201 @@ def _proxy_openai(api_key, model, prompt, system_prompt, stream, options):
         "max_tokens": options.get("maxTokens", 1024),
         "temperature": options.get("temperature", 0.1),
         "stream": stream,
-    }
-    req = urllib.request.Request(
+    }).encode()
+    return _upstream_request(
         "https://api.openai.com/v1/chat/completions",
-        data=json.dumps(body).encode(),
-        headers={
+        body,
+        {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
     )
-    return urllib.request.urlopen(req, context=_ssl_context())
 
 
-def _proxy_google(api_key, model, prompt, system_prompt, options):
-    body = {
+def _call_google(api_key, model, prompt, system_prompt, options):
+    """Call Google Gemini API (non-streaming only)."""
+    body = json.dumps({
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": options.get("temperature", 0.1),
             "maxOutputTokens": options.get("maxTokens", 1024),
         },
-    }
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
+    }).encode()
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={api_key}"
     )
-    return urllib.request.urlopen(req, context=_ssl_context())
+    return _upstream_request(url, body, {"Content-Type": "application/json"})
 
 
-def _extract_anthropic_text(data):
-    for block in data.get("content", []):
-        if block.get("type") == "text":
-            return block.get("text", "")
-    return ""
-
-
-def _extract_openai_text(data):
-    choices = data.get("choices", [])
-    if choices:
-        return choices[0].get("message", {}).get("content", "")
-    return ""
-
-
-def _extract_google_text(data):
-    candidates = data.get("candidates", [])
-    if candidates:
-        parts = candidates[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts)
-    return ""
-
-
-def _stream_anthropic(response, wfile):
-    for raw_line in response:
-        line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() == "[DONE]":
-            break
-        try:
-            event = json.loads(payload)
-        except json.JSONDecodeError:
-            continue
-        etype = event.get("type", "")
-        if etype == "content_block_delta":
-            text = event.get("delta", {}).get("text", "")
-            if text:
-                chunk = json.dumps({"response": text, "done": False}) + "\n"
-                wfile.write(chunk.encode())
-                wfile.flush()
-        elif etype == "message_stop":
-            break
-    done_line = json.dumps({"response": "", "done": True}) + "\n"
-    wfile.write(done_line.encode())
-    wfile.flush()
-
-
-def _stream_openai(response, wfile):
-    for raw_line in response:
-        line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() == "[DONE]":
-            break
-        try:
-            event = json.loads(payload)
-        except json.JSONDecodeError:
-            continue
-        choices = event.get("choices", [])
+def _extract_text(provider, data):
+    """Pull generated text out of a provider's JSON response."""
+    if provider == "anthropic":
+        for block in data.get("content", []):
+            if block.get("type") == "text":
+                return block.get("text", "")
+        return ""
+    if provider == "openai":
+        choices = data.get("choices", [])
         if choices:
-            delta = choices[0].get("delta", {})
-            text = delta.get("content", "")
-            if text:
-                chunk = json.dumps({"response": text, "done": False}) + "\n"
-                wfile.write(chunk.encode())
-                wfile.flush()
-    done_line = json.dumps({"response": "", "done": True}) + "\n"
-    wfile.write(done_line.encode())
+            return choices[0].get("message", {}).get("content", "")
+        return ""
+    if provider == "google":
+        candidates = data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            return "".join(p.get("text", "") for p in parts)
+        return ""
+    return ""
+
+
+def _relay_sse(provider, upstream_resp, wfile):
+    """Read SSE from upstream (Anthropic/OpenAI) and re-emit as NDJSON."""
+    for raw_line in upstream_resp:
+        line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+        if not line.startswith("data: "):
+            continue
+        payload = line[6:]
+        if payload.strip() == "[DONE]":
+            break
+
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+
+        text = ""
+        if provider == "anthropic":
+            if event.get("type") == "content_block_delta":
+                text = event.get("delta", {}).get("text", "")
+            elif event.get("type") == "message_stop":
+                break
+        elif provider == "openai":
+            choices = event.get("choices", [])
+            if choices:
+                text = choices[0].get("delta", {}).get("content", "")
+
+        if text:
+            chunk = json.dumps({"response": text, "done": False}) + "\n"
+            wfile.write(chunk.encode())
+            wfile.flush()
+
+    # Final done sentinel
+    wfile.write(json.dumps({"response": "", "done": True}).encode() + b"\n")
     wfile.flush()
 
+
+# ---------------------------------------------------------------------------
+# HTTP Handler
+# ---------------------------------------------------------------------------
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    def _json_response(self, code, data):
+    """Serves static files and API endpoints."""
+
+    # Use HTTP/1.1 so the browser can reuse connections properly
+    protocol_version = "HTTP/1.1"
+
+    def _cors_headers(self):
+        """Add CORS headers to every response."""
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def _json_ok(self, data, code=200):
+        """Send a JSON response with proper headers."""
         body = json.dumps(data).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._cors_headers()
         self.end_headers()
         self.wfile.write(body)
+
+    def _json_error(self, code, message):
+        """Send a JSON error response."""
+        self._json_ok({"error": message}, code)
+
+    # -- CORS preflight -------------------------------------------------------
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    # -- GET routes -----------------------------------------------------------
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/projects":
-            self._json_response(200, get_projects())
+            self._json_ok(get_projects())
         elif parsed.path == "/api/projects-root":
-            self._json_response(200, {"path": str(get_projects_root())})
+            self._json_ok({"path": str(get_projects_root())})
         elif parsed.path == "/api/browse":
             qs = urllib.parse.parse_qs(parsed.query)
             req_path = qs.get("path", [None])[0]
             data, err = browse_directory(req_path)
             if err:
-                self._json_response(400, {"error": err})
+                self._json_error(400, err)
             else:
                 data["drives"] = get_drive_roots()
-                self._json_response(200, data)
+                self._json_ok(data)
         elif parsed.path.startswith("/api/projects/") and parsed.path.endswith("/scan"):
-            project_name = urllib.parse.unquote(parsed.path[len("/api/projects/"):-len("/scan")])
-            self._json_response(200, scan_project(project_name))
+            project_name = urllib.parse.unquote(
+                parsed.path[len("/api/projects/"):-len("/scan")]
+            )
+            self._json_ok(scan_project(project_name))
         else:
             super().do_GET()
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
+    # -- POST routes ----------------------------------------------------------
 
-    def _read_json_body(self):
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/projects-root":
+            self._handle_set_projects_root()
+        elif path == "/api/ai/proxy":
+            self._handle_ai_proxy()
+        else:
+            self._json_error(404, "Not found")
+
+    def _read_body_json(self):
+        """Read and parse the request body as JSON."""
         length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            raise ValueError("Empty request body")
         raw = self.rfile.read(length)
         return json.loads(raw)
 
-    def _stream_response_start(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/x-ndjson")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Transfer-Encoding", "chunked")
-        self.end_headers()
+    def _handle_set_projects_root(self):
+        try:
+            data = self._read_body_json()
+        except Exception:
+            self._json_error(400, "Invalid JSON")
+            return
+        path = data.get("path", "").strip()
+        if not path:
+            self._json_error(400, "Path is required")
+            return
+        ok, msg = set_projects_root(path)
+        if ok:
+            self._json_ok({"path": msg})
+        else:
+            self._json_error(400, msg)
 
-    def _handle_ai_proxy(self, data):
+    def _handle_ai_proxy(self):
+        """Proxy a cloud AI request to Anthropic, OpenAI, or Google."""
+
+        # --- Parse request ---
+        try:
+            data = self._read_body_json()
+        except Exception:
+            self._json_error(400, "Invalid JSON")
+            return
+
         provider = data.get("provider", "")
         api_key = data.get("apiKey", "")
         model = data.get("model", "")
@@ -374,91 +431,83 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         options = data.get("options", {})
 
         if not provider or not api_key or not model:
-            self._json_response(400, {"error": "Missing provider, apiKey, or model"})
+            self._json_error(400, "Missing provider, apiKey, or model")
             return
 
+        if provider not in ("anthropic", "openai", "google"):
+            self._json_error(400, f"Unknown provider: {provider}")
+            return
+
+        # --- Call upstream API ---
         try:
             if provider == "anthropic":
-                if stream:
-                    resp = _proxy_anthropic(api_key, model, prompt, system_prompt, True, options)
-                    self._stream_response_start()
-                    _stream_anthropic(resp, self.wfile)
-                    resp.close()
-                else:
-                    resp = _proxy_anthropic(api_key, model, prompt, system_prompt, False, options)
-                    result = json.loads(resp.read().decode())
-                    resp.close()
-                    text = _extract_anthropic_text(result)
-                    self._json_response(200, {"response": text, "done": True})
-
+                resp = _call_anthropic(api_key, model, prompt, system_prompt, stream, options)
             elif provider == "openai":
-                if stream:
-                    resp = _proxy_openai(api_key, model, prompt, system_prompt, True, options)
-                    self._stream_response_start()
-                    _stream_openai(resp, self.wfile)
-                    resp.close()
-                else:
-                    resp = _proxy_openai(api_key, model, prompt, system_prompt, False, options)
-                    result = json.loads(resp.read().decode())
-                    resp.close()
-                    text = _extract_openai_text(result)
-                    self._json_response(200, {"response": text, "done": True})
-
+                resp = _call_openai(api_key, model, prompt, system_prompt, stream, options)
             elif provider == "google":
-                resp = _proxy_google(api_key, model, prompt, system_prompt, options)
-                result = json.loads(resp.read().decode())
-                resp.close()
-                text = _extract_google_text(result)
+                # Google Gemini doesn't support streaming — always non-stream
+                resp = _call_google(api_key, model, prompt, system_prompt, options)
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="replace")
+            self._json_error(e.code, error_body)
+            return
+        except Exception as e:
+            self._json_error(502, str(e))
+            return
+
+        # --- Return response to browser ---
+        try:
+            if stream and provider in ("anthropic", "openai"):
+                # Stream: send NDJSON lines
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self._cors_headers()
+                self.send_header("Transfer-Encoding", "chunked")
+                self.end_headers()
+                _relay_sse(provider, resp, self.wfile)
+            else:
+                # Non-stream (or Google): read full response, extract text
+                result = json.loads(resp.read().decode("utf-8"))
+                text = _extract_text(provider, result)
                 if stream:
-                    self._stream_response_start()
-                    chunk = json.dumps({"response": text, "done": False}) + "\n"
-                    self.wfile.write(chunk.encode())
-                    done_line = json.dumps({"response": "", "done": True}) + "\n"
-                    self.wfile.write(done_line.encode())
+                    # Google with stream=true: fake it as two NDJSON lines
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-ndjson")
+                    self._cors_headers()
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({"response": text, "done": False}).encode() + b"\n"
+                    )
+                    self.wfile.write(
+                        json.dumps({"response": "", "done": True}).encode() + b"\n"
+                    )
                     self.wfile.flush()
                 else:
-                    self._json_response(200, {"response": text, "done": True})
-
-            else:
-                self._json_response(400, {"error": f"Unknown provider: {provider}"})
-
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="replace")
-            self._json_response(e.code, {"error": body})
+                    self._json_ok({"response": text, "done": True})
         except Exception as e:
-            self._json_response(502, {"error": str(e)})
-
-    def do_POST(self):
-        parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/api/projects-root":
+            # If headers are already sent we can't send a JSON error,
+            # but at least don't crash the server
             try:
-                data = self._read_json_body()
+                self._json_error(502, str(e))
             except Exception:
-                self._json_response(400, {"error": "Invalid JSON"})
-                return
-            path = data.get("path", "").strip()
-            if not path:
-                self._json_response(400, {"error": "Path is required"})
-                return
-            ok, msg = set_projects_root(path)
-            if ok:
-                self._json_response(200, {"path": msg})
-            else:
-                self._json_response(400, {"error": msg})
-        elif parsed.path == "/api/ai/proxy":
-            try:
-                data = self._read_json_body()
-            except Exception:
-                self._json_response(400, {"error": "Invalid JSON"})
-                return
-            self._handle_ai_proxy(data)
-        else:
-            self.send_response(404)
-            self.end_headers()
+                pass
+        finally:
+            resp.close()
 
-    def log_message(self, fmt, *args):
-        pass  # suppress per-request noise
+    # -- Logging --------------------------------------------------------------
 
+    def log_message(self, format, *args):
+        """Log every request for debugging."""
+        try:
+            print(f"[{self.command}] {self.path} -> {format % args}")
+        except Exception:
+            print(f"[LOG] {format} {args}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     os.chdir(pathlib.Path(__file__).parent)

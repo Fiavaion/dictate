@@ -424,6 +424,65 @@ select.voice-select { min-width: 160px; max-width: 220px; }
 }
 .pane-divider.ai-active::after { width: 100%; }
 
+/* ── Typography Controls ── */
+.typo-toggle { font-weight: 600; font-size: 0.6rem !important; }
+.typo-toggle.active { color: var(--accent2); border-color: var(--accent2); }
+
+.typo-controls {
+  display: none;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 0 2px;
+  flex-shrink: 0;
+}
+.typo-controls.open { display: flex; }
+
+.typo-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+  user-select: none;
+}
+.typo-controls input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 64px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.typo-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent2);
+  cursor: pointer;
+}
+.typo-controls input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: none;
+  cursor: pointer;
+}
+.typo-val {
+  display: inline-block;
+  min-width: 2.2em;
+  text-align: right;
+  color: var(--text);
+  opacity: 0.7;
+}
+
 /* Diff highlighting */
 .diff-changed {
   border-bottom: 1px dashed var(--accent2);
@@ -845,6 +904,40 @@ footer {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--dim);
+}
+
+/* AI Mode Switch (Local / Cloud) */
+.ai-mode-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-mode-switch {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ai-mode-btn {
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: none;
+  border: none;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ai-mode-btn:hover { color: var(--text); }
+.ai-mode-btn.active {
+  color: var(--bg);
+  background: var(--accent2);
+}
+.ai-mode-btn.active[data-mode="cloud"] {
+  background: var(--ai-glow);
 }
 
 /* Footer template selector */

@@ -15,11 +15,11 @@ const PROVIDERS = {
   },
   anthropic: {
     label: 'Anthropic',
-    defaultModel: 'claude-haiku-4-5-latest',
+    defaultModel: 'claude-haiku-4-5',
     models: [
-      { name: 'claude-haiku-4-5-latest', label: 'Claude Haiku' },
-      { name: 'claude-sonnet-4-5-latest', label: 'Claude Sonnet' },
-      { name: 'claude-opus-4-latest', label: 'Claude Opus' },
+      { name: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+      { name: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+      { name: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
     ],
     local: false,
   },
@@ -48,6 +48,10 @@ const STORAGE_PROVIDER = 'fiavaion-ai-provider';
 const STORAGE_KEY_PREFIX = 'fiavaion-ai-apikey-';
 const STORAGE_MODEL_PREFIX = 'fiavaion-ai-model-';
 
+// Proxy endpoint — always use the full URL so there's no ambiguity about
+// which server the browser is talking to.
+const PROXY_URL = `${window.location.origin}/api/ai/proxy`;
+
 function b64Encode(str) {
   try { return btoa(unescape(encodeURIComponent(str))); } catch { return ''; }
 }
@@ -68,6 +72,10 @@ export class AIClient {
       this._providerModels[key] = [...cfg.models];
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Provider / model getters-setters
+  // -------------------------------------------------------------------------
 
   get provider() { return this._provider; }
 
@@ -103,7 +111,14 @@ export class AIClient {
   getSelectedModel(provider) {
     const p = provider || this._provider;
     const stored = localStorage.getItem(STORAGE_MODEL_PREFIX + p);
-    return stored || this.getDefaultModel(p);
+    // Validate stored model still exists in our list; if not, use default
+    if (stored) {
+      const known = this._providerModels[p] || [];
+      if (known.length === 0 || known.some(m => m.name === stored)) return stored;
+      // Stale model ID — clear it
+      localStorage.removeItem(STORAGE_MODEL_PREFIX + p);
+    }
+    return this.getDefaultModel(p);
   }
 
   setSelectedModel(provider, model) {
@@ -128,6 +143,10 @@ export class AIClient {
     this._ollamaClient = new OllamaClient(url);
   }
 
+  // -------------------------------------------------------------------------
+  // API key management
+  // -------------------------------------------------------------------------
+
   setApiKey(provider, key, remember = true) {
     if (remember) {
       localStorage.setItem(STORAGE_KEY_PREFIX + provider, b64Encode(key));
@@ -148,6 +167,10 @@ export class AIClient {
     if (this._sessionKeys) delete this._sessionKeys[provider];
   }
 
+  // -------------------------------------------------------------------------
+  // Connection check
+  // -------------------------------------------------------------------------
+
   async checkConnection() {
     if (this._provider === 'ollama') {
       const ok = await this._ollamaClient.checkConnection();
@@ -162,7 +185,7 @@ export class AIClient {
     }
 
     try {
-      const res = await fetch('/api/ai/proxy', {
+      const res = await fetch(PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,24 +199,37 @@ export class AIClient {
         }),
         signal: AbortSignal.timeout(15000),
       });
-      this._connected = res.ok;
-      if (res.ok) return { ok: true };
-      // Extract error detail from proxy response
+
+      if (res.ok) {
+        this._connected = true;
+        return { ok: true };
+      }
+
+      // Try to extract a useful error message
+      this._connected = false;
       try {
         const body = await res.json();
         const raw = body.error || '';
-        // Try to parse nested JSON error (e.g. from Anthropic)
+        // Anthropic wraps errors in nested JSON
         try {
           const nested = JSON.parse(raw);
-          const msg = nested?.error?.message || raw;
-          return { ok: false, error: msg };
-        } catch { return { ok: false, error: raw || `HTTP ${res.status}` }; }
-      } catch { return { ok: false, error: `HTTP ${res.status}` }; }
+          return { ok: false, error: nested?.error?.message || raw };
+        } catch {
+          return { ok: false, error: raw || `HTTP ${res.status}` };
+        }
+      } catch {
+        return { ok: false, error: `HTTP ${res.status}` };
+      }
     } catch (e) {
       this._connected = false;
-      return { ok: false, error: e.name === 'TimeoutError' ? 'Request timed out' : (e.message || 'Network error') };
+      if (e.name === 'TimeoutError') return { ok: false, error: 'Request timed out' };
+      return { ok: false, error: e.message || 'Network error' };
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Monitoring
+  // -------------------------------------------------------------------------
 
   startMonitoring(intervalMs = 10000, onStatusChange) {
     if (this._provider === 'ollama') {
@@ -227,6 +263,10 @@ export class AIClient {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Generation — public API (same signature for all callers)
+  // -------------------------------------------------------------------------
+
   async *generate(model, prompt, systemPrompt, options = {}, signal) {
     if (this._provider === 'ollama') {
       yield* this._generateOllama(model, prompt, systemPrompt, options, signal);
@@ -241,6 +281,10 @@ export class AIClient {
     }
     return this._generateFullCloud(model, prompt, systemPrompt, options, signal);
   }
+
+  // -------------------------------------------------------------------------
+  // Ollama (local) — unchanged
+  // -------------------------------------------------------------------------
 
   async *_generateOllama(model, prompt, systemPrompt, options, signal) {
     const res = await fetch(`${this._ollamaClient.baseUrl}/api/generate`, {
@@ -299,22 +343,30 @@ export class AIClient {
     return data.response || '';
   }
 
+  // -------------------------------------------------------------------------
+  // Cloud (Anthropic / OpenAI / Google) — via server proxy
+  // -------------------------------------------------------------------------
+
+  _buildProxyPayload(model, prompt, systemPrompt, stream, options) {
+    return JSON.stringify({
+      provider: this._provider,
+      apiKey: this.getApiKey(this._provider),
+      model,
+      prompt,
+      systemPrompt: systemPrompt || '',
+      stream,
+      options,
+    });
+  }
+
   async *_generateCloud(model, prompt, systemPrompt, options, signal) {
     const apiKey = this.getApiKey(this._provider);
     if (!apiKey) throw new Error(`No API key for ${this._provider}`);
 
-    const res = await fetch('/api/ai/proxy', {
+    const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: this._provider,
-        apiKey,
-        model,
-        prompt,
-        systemPrompt: systemPrompt || '',
-        stream: true,
-        options,
-      }),
+      body: this._buildProxyPayload(model, prompt, systemPrompt, true, options),
       signal,
     });
 
@@ -323,6 +375,7 @@ export class AIClient {
       throw new Error(`AI proxy error ${res.status}: ${text}`);
     }
 
+    // Read NDJSON stream from proxy
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -341,7 +394,7 @@ export class AIClient {
           const data = JSON.parse(line);
           yield { token: data.response || '', done: !!data.done };
           if (data.done) return;
-        } catch { /* skip malformed lines */ }
+        } catch { /* skip malformed NDJSON lines */ }
       }
     }
   }
@@ -350,18 +403,10 @@ export class AIClient {
     const apiKey = this.getApiKey(this._provider);
     if (!apiKey) throw new Error(`No API key for ${this._provider}`);
 
-    const res = await fetch('/api/ai/proxy', {
+    const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: this._provider,
-        apiKey,
-        model,
-        prompt,
-        systemPrompt: systemPrompt || '',
-        stream: false,
-        options,
-      }),
+      body: this._buildProxyPayload(model, prompt, systemPrompt, false, options),
       signal,
     });
 

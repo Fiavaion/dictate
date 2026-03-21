@@ -80,37 +80,27 @@ Best,`,
       maxTokens: 1000,
     },
   },
-  notes: {
-    label: 'Notes',
-    description: 'Meeting notes, minutes, and summaries',
-    instruction: `Transform this dictated text into organized notes. Extract and group:
-- Key discussion points or topics
-- Decisions made
-- Action items (with owners if mentioned)
-- Important dates, numbers, or deadlines
-
-Use bullet points and short, scannable phrases rather than full sentences. Group related items under topic headers if the dictation covers multiple subjects.`,
-    systemPrompt: `You are a note-taking assistant. Transform spoken dictation into clean, organized notes. Extract key points, action items, decisions, and important details. Use bullet points and concise phrasing. Group related items logically.`,
+  academic: {
+    label: 'Academic',
+    description: 'Art & design academic writing style',
+    instruction: `Transform this dictated text into polished academic prose suitable for an art and design context. The speaker is likely a student articulating ideas in natural, conversational language — rewrite their words into clear, critically engaged academic writing. Specifically:
+- Use appropriate art and design terminology and discourse (e.g. visual culture, materiality, practice-led, aesthetic, semiotics, spatial, phenomenological)
+- Frame observations as critical analysis rather than casual opinion
+- Connect ideas to broader theoretical or contextual frameworks where implied
+- Maintain the speaker's original argument and intent — do not invent new claims
+- Use third person or appropriate academic voice, not conversational first person
+- Structure into coherent paragraphs with logical flow`,
+    systemPrompt: `You are an academic writing assistant specialising in art and design disciplines. Transform spoken, conversational dictation from students into well-structured academic prose. Use the conventions of art and design critical writing: appropriate terminology, analytical framing, references to visual culture and creative practice, and a formal but accessible academic register. Preserve the speaker's ideas and arguments faithfully — elevate the language and structure without changing the meaning or adding unsupported claims.`,
     examples: [
       {
-        input: `so in today's meeting we talked about the website redesign John said he'll have the mockups ready by Friday and then we discussed the budget which is looking tight so Maria is going to look into cheaper hosting options also we decided to push the launch to March 15th instead of March 1st`,
-        output: `## Website Redesign
-- John will have mockups ready by Friday
-- Launch pushed to March 15th (was March 1st)
-
-## Budget
-- Budget is tight
-- Maria investigating cheaper hosting options
-
-## Action Items
-- John: mockups by Friday
-- Maria: research hosting alternatives`,
+        input: `so basically my project is about how people interact with spaces in cities and I looked at this abandoned building and I think the graffiti on it kind of shows how people reclaim spaces that aren't really theirs and it makes you think about who owns public space and stuff like that`,
+        output: `This project investigates the relationship between urban inhabitants and the spaces they occupy, with a particular focus on acts of spatial reclamation. The study centres on an abandoned building whose surfaces have been marked with graffiti — a practice that can be understood as an assertion of presence and ownership in contested public space. The graffiti functions not merely as vandalism but as a form of visual communication through which individuals lay claim to environments from which they are otherwise excluded. This raises critical questions about the politics of public space: who determines its use, and how do unofficial creative interventions challenge or subvert those boundaries?`,
       },
     ],
-    constraints: 'Return structured notes only. Use bullet points and short headers. No prose paragraphs, no preamble, no explanation.',
+    constraints: 'Return polished academic prose only. Use formal register appropriate for art and design discourse. No bullet points, no preamble, no explanation of changes. Do not fabricate references or citations.',
     parameters: {
-      temperature: 0.2,
-      maxTokens: 1200,
+      temperature: 0.3,
+      maxTokens: 1500,
     },
   },
   creative: {

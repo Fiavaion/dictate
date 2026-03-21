@@ -220,10 +220,14 @@ function onProjectSelected(name) {
     promptStructurer.stackContext = stackInput.value;
   }
 
-  // Apply saved model if available
+  // Apply saved model if available — skip if it's from a different provider type
   if (saved.correctionModel && $('modelSelect')) {
-    correctionPipeline.setModel(saved.correctionModel);
-    $('modelSelect').value = saved.correctionModel;
+    const isCloud = aiClient.providerConfig && !aiClient.providerConfig.local;
+    const looksLocal = saved.correctionModel.includes(':');
+    if (!(isCloud && looksLocal)) {
+      correctionPipeline.setModel(saved.correctionModel);
+      $('modelSelect').value = saved.correctionModel;
+    }
   }
 
   // Apply saved template if available
@@ -1017,7 +1021,7 @@ function renderModelSelector() {
   for (const m of aiClient.models) {
     const opt = document.createElement('option');
     opt.value = m.name;
-    opt.textContent = `${m.name} (${m.size})`;
+    opt.textContent = m.label ? `${m.label} (${m.name})` : m.size ? `${m.name} (${m.size})` : m.name;
     select.appendChild(opt);
   }
   select.value = correctionPipeline.model;
@@ -1701,10 +1705,28 @@ function init() {
   initVU();
   drawWave();
 
-  // Load settings
+  // Load settings — use stored model only if it belongs to the current provider
   const settings = loadSettings();
-  if (settings.correctionModel) correctionPipeline.setModel(settings.correctionModel);
-  if (settings.structureModel) promptStructurer.setModel(settings.structureModel);
+  const currentDefault = aiClient.getSelectedModel();
+  if (settings.correctionModel) {
+    // If we're on a cloud provider, don't load an Ollama model name (and vice versa)
+    const isCloud = aiClient.providerConfig && !aiClient.providerConfig.local;
+    const looksLocal = settings.correctionModel.includes(':');
+    if (isCloud && looksLocal) {
+      correctionPipeline.setModel(currentDefault);
+    } else {
+      correctionPipeline.setModel(settings.correctionModel);
+    }
+  }
+  if (settings.structureModel) {
+    const isCloud = aiClient.providerConfig && !aiClient.providerConfig.local;
+    const looksLocal = settings.structureModel.includes(':');
+    if (isCloud && looksLocal) {
+      promptStructurer.setModel(currentDefault);
+    } else {
+      promptStructurer.setModel(settings.structureModel);
+    }
+  }
   if (settings.aiEnabled === false) correctionPipeline.setEnabled(false);
 
   // Restore session ID from settings
@@ -1736,6 +1758,20 @@ function init() {
 
   // AI Settings modal
   apiSettingsModal.render();
+  apiSettingsModal.onSave = (provider) => {
+    const isCloud = provider !== 'ollama';
+    const switchEl = $('aiModeSwitch');
+    if (switchEl) {
+      switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === (isCloud ? 'cloud' : 'local'));
+      });
+    }
+    // Sync both pipelines to the new provider's model
+    const model = aiClient.getSelectedModel(provider);
+    correctionPipeline.setModel(model);
+    promptStructurer.setModel(model);
+    _refreshAIConnection();
+  };
   const btnAISettings = $('btnAISettings');
   if (btnAISettings) {
     btnAISettings.onclick = () => apiSettingsModal.open();
@@ -1896,6 +1932,173 @@ function init() {
 }
 
 // ══════════════════════════════════════════
+// AI Mode Switch (Local / Cloud)
+// ══════════════════════════════════════════
+function setAIMode(mode) {
+  const switchEl = $('aiModeSwitch');
+  if (!switchEl) return;
+
+  if (mode === 'cloud') {
+    // Find the first cloud provider with an API key
+    const cloudProviders = aiClient.allProviders.filter(p => !p.local);
+    const available = cloudProviders.find(p => aiClient.getApiKey(p.key));
+    if (!available) {
+      flashCmd('NO API KEY — OPEN SETTINGS TO ADD ONE');
+      apiSettingsModal.open();
+      // Keep toggle on local until a key is saved
+      switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === 'local');
+      });
+      return;
+    }
+    aiClient.setProvider(available.key);
+    // Switch both pipelines to cloud provider's default/selected model
+    const cloudModel = aiClient.getSelectedModel(available.key);
+    correctionPipeline.setModel(cloudModel);
+    promptStructurer.setModel(cloudModel);
+    flashCmd(`CLOUD: ${available.label.toUpperCase()}`);
+  } else {
+    aiClient.setProvider('ollama');
+    // Restore local model from settings or use default
+    const settings = loadSettings();
+    const localModel = settings.correctionModel || aiClient.getDefaultModel('ollama');
+    const structModel = settings.structureModel || aiClient.getDefaultModel('ollama');
+    // Only set local model if it looks like an Ollama model (not a cloud model ID)
+    const ollamaModels = aiClient.models.map(m => m.name);
+    if (ollamaModels.includes(localModel)) {
+      correctionPipeline.setModel(localModel);
+    } else {
+      correctionPipeline.setModel(aiClient.getDefaultModel('ollama'));
+    }
+    if (ollamaModels.includes(structModel)) {
+      promptStructurer.setModel(structModel);
+    } else {
+      promptStructurer.setModel(aiClient.getDefaultModel('ollama'));
+    }
+    flashCmd('LOCAL: OLLAMA');
+  }
+
+  // Update button states
+  switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+
+  // Refresh model selector and re-check connection
+  _refreshAIConnection();
+}
+
+async function _refreshAIConnection() {
+  renderModelSelector();
+  aiClient.stopMonitoring();
+
+  // Do an immediate connection check so the user sees feedback fast
+  const result = await aiClient.checkConnection();
+  if (result.ok) {
+    setAIStatus('connected');
+    renderModelSelector();
+  } else {
+    setAIStatus('offline');
+    if (result.error) flashCmd(result.error.toUpperCase());
+  }
+
+  // Continue periodic monitoring
+  aiClient.startMonitoring(15000, (connected, models) => {
+    if (connected) {
+      setAIStatus('connected');
+      renderModelSelector();
+    } else {
+      setAIStatus('offline');
+    }
+  });
+}
+
+function initAIModeSwitch() {
+  const currentProvider = aiClient.provider;
+  const isCloud = currentProvider !== 'ollama';
+  const switchEl = $('aiModeSwitch');
+  if (!switchEl) return;
+  switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === (isCloud ? 'cloud' : 'local'));
+  });
+}
+
+// ══════════════════════════════════════════
+// Typography Controls (per-pane)
+// ══════════════════════════════════════════
+const TYPO_TARGETS = {
+  raw: () => $('rawContent'),
+  refined: () => $('refinedContent'),
+};
+
+const TYPO_DEFAULTS = { fontSize: 16, letterSpacing: 1, lineHeight: 175 };
+
+function toggleTypoControls(pane) {
+  const suffix = pane === 'raw' ? 'Raw' : 'Refined';
+  const panel = $(`typoControls${suffix}`);
+  if (!panel) return;
+  panel.classList.toggle('open');
+  const header = panel.previousElementSibling;
+  if (header) {
+    const btn = header.querySelector('.typo-toggle');
+    if (btn) btn.classList.toggle('active', panel.classList.contains('open'));
+  }
+}
+
+function updateTypo(slider) {
+  const { pane, prop } = slider.dataset;
+  const el = TYPO_TARGETS[pane]();
+  if (!el) return;
+  const v = Number(slider.value);
+  const suffix = pane === 'raw' ? 'Raw' : 'Refined';
+
+  if (prop === 'fontSize') {
+    el.style.fontSize = `${v}px`;
+    $(`typoVal${suffix}Size`).textContent = v;
+  } else if (prop === 'letterSpacing') {
+    const em = v / 1000;
+    el.style.letterSpacing = `${em}em`;
+    $(`typoVal${suffix}Tracking`).textContent = em.toFixed(2);
+  } else if (prop === 'lineHeight') {
+    const lh = v / 100;
+    el.style.lineHeight = lh;
+    $(`typoVal${suffix}Leading`).textContent = lh.toFixed(2);
+  }
+  saveTypoSettings();
+}
+
+function saveTypoSettings() {
+  const data = {};
+  for (const pane of ['raw', 'refined']) {
+    const suffix = pane === 'raw' ? 'Raw' : 'Refined';
+    const panel = $(`typoControls${suffix}`);
+    const sliders = panel.querySelectorAll('input[type="range"]');
+    data[pane] = {};
+    sliders.forEach(s => { data[pane][s.dataset.prop] = Number(s.value); });
+  }
+  localStorage.setItem('dictate_typo', JSON.stringify(data));
+}
+
+function loadTypoSettings() {
+  const raw = localStorage.getItem('dictate_typo');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    for (const pane of ['raw', 'refined']) {
+      if (!data[pane]) continue;
+      const suffix = pane === 'raw' ? 'Raw' : 'Refined';
+      const panel = $(`typoControls${suffix}`);
+      for (const [prop, val] of Object.entries(data[pane])) {
+        const slider = panel.querySelector(`input[data-prop="${prop}"]`);
+        if (slider) {
+          slider.value = val;
+          updateTypo(slider);
+        }
+      }
+    }
+  } catch { /* ignore corrupt data */ }
+}
+
+// ══════════════════════════════════════════
 // Expose to HTML onclick handlers
 // ══════════════════════════════════════════
 window.toggleRecording = toggleRecording;
@@ -1925,6 +2128,11 @@ window.openFormatCards = openFormatCards;
 window.generateDiagram = generateDiagram;
 window.acceptGhostText = acceptGhostText;
 window.dismissGhostText = dismissGhostText;
+window.toggleTypoControls = toggleTypoControls;
+window.updateTypo = updateTypo;
+window.setAIMode = setAIMode;
 
 // Boot
 init();
+initAIModeSwitch();
+loadTypoSettings();

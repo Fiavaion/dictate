@@ -187,7 +187,13 @@
       <div class="pane-actions">
         <button class="pane-copy-btn" onclick="readPane('raw')" title="Read aloud">READ</button>
         <button class="pane-copy-btn" onclick="copyRaw()" title="Copy raw text">COPY</button>
+        <button class="pane-copy-btn typo-toggle" onclick="toggleTypoControls('raw')" title="Typography">Aa</button>
       </div>
+    </div>
+    <div class="typo-controls" id="typoControlsRaw">
+      <label>Size <input type="range" min="12" max="32" value="16" data-pane="raw" data-prop="fontSize" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawSize">16</span>px</label>
+      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="raw" data-prop="letterSpacing" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawTracking">0</span>em</label>
+      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="raw" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper raw-pane">
       <div class="transcript-scroll" id="rawScroll">
@@ -206,7 +212,13 @@
       <div class="pane-actions">
         <button class="pane-copy-btn" onclick="readPane('refined')" title="Read aloud">READ</button>
         <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
+        <button class="pane-copy-btn typo-toggle" onclick="toggleTypoControls('refined')" title="Typography">Aa</button>
       </div>
+    </div>
+    <div class="typo-controls" id="typoControlsRefined">
+      <label>Size <input type="range" min="12" max="32" value="16" data-pane="refined" data-prop="fontSize" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedSize">16</span>px</label>
+      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="refined" data-prop="letterSpacing" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedTracking">0</span>em</label>
+      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="refined" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper refined-pane">
       <div class="transcript-scroll" id="refinedScroll">
@@ -268,14 +280,17 @@
         <button class="btn-secondary" onclick="openPromptBuilder()" title="Build custom template" style="padding:4px 8px;font-size:0.55rem">+</button>
       </div>
 
-      <label class="footer-toggle" title="Auto-correct">
-        <span class="footer-toggle-label">AI</span>
+      <div class="ai-mode-group" title="AI provider mode">
         <label class="toggle">
           <input type="checkbox" id="aiToggle" checked>
           <div class="toggle-track"></div>
           <div class="toggle-thumb"></div>
         </label>
-      </label>
+        <div class="ai-mode-switch" id="aiModeSwitch">
+          <button class="ai-mode-btn active" data-mode="local" onclick="setAIMode('local')">LOCAL</button>
+          <button class="ai-mode-btn" data-mode="cloud" onclick="setAIMode('cloud')">CLOUD</button>
+        </div>
+      </div>
 
       <div class="copy-group">
         <button class="btn-copy" id="btnCopy" onclick="copyRefined()">COPY</button>
