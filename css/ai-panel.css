@@ -1,0 +1,107 @@
+/* AI Panel — additional styles for the collapsible AI sidebar */
+/* Most styles are in theme.css — this file handles transitions and responsive */
+
+.ai-sidebar {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Settings panel within AI sidebar */
+.ai-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.ai-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-setting-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 18px;
+  cursor: pointer;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 9px;
+  transition: background 0.2s;
+}
+.toggle input:checked + .toggle-track {
+  background: var(--accent2);
+}
+.toggle-thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+  background: var(--text);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle input:checked ~ .toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* Project context inputs */
+.ai-context-input {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 6px 8px;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ai-context-input:focus {
+  border-color: var(--ai-glow);
+}
+.ai-context-input::placeholder {
+  color: var(--dim);
+}
+
+/* Responsive: collapse sidebar on narrow screens */
+@media (max-width: 900px) {
+  :root {
+    --sidebar-w: 260px;
+  }
+  .ai-sidebar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    z-index: 350;
+    transform: translateX(100%);
+  }
+  .ai-panel-open .ai-sidebar {
+    transform: translateX(0);
+  }
+  .app.ai-panel-open {
+    grid-template-columns: 1fr;
+  }
+}
