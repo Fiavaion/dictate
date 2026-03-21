@@ -15,10 +15,10 @@ const PROVIDERS = {
   },
   anthropic: {
     label: 'Anthropic',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-haiku-4-20250414',
     models: [
-      { name: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
       { name: 'claude-haiku-4-20250414', label: 'Claude Haiku 4' },
+      { name: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
     ],
     local: false,
   },
