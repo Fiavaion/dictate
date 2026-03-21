@@ -720,6 +720,24 @@ function readBack() {
 }
 
 // ══════════════════════════════════════════
+// Pane copy
+// ══════════════════════════════════════════
+async function copyPaneContent(pane) {
+  let text = '';
+  if (pane === 'refined') {
+    // If in structure view, copy structured prompt; otherwise copy refined
+    if (state.structureView && state.structuredPrompt) {
+      text = state.structuredPrompt;
+    } else {
+      text = correctionPipeline.correctedText || state.rawTranscript.trim();
+    }
+  }
+  if (!text) { flashCmd('NOTHING TO COPY'); return; }
+  const ok = await copyToClipboard(text);
+  if (ok) flashCmd(state.structureView ? 'STRUCTURED COPIED' : 'REFINED COPIED');
+}
+
+// ══════════════════════════════════════════
 // Template Selector
 // ══════════════════════════════════════════
 function renderTemplateSelector() {
@@ -1126,6 +1144,7 @@ window.copyToClaude = copyToClaude;
 window.toggleCopyMenu = toggleCopyMenu;
 window.doStructure = doStructure;
 window.exitStructureView = exitStructureView;
+window.copyPaneContent = copyPaneContent;
 
 // Boot
 init();

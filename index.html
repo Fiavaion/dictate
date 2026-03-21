@@ -126,7 +126,10 @@
   <!-- TRANSCRIPT — Dual Pane -->
   <div class="transcript-zone">
     <!-- Raw dictation pane -->
-    <div class="pane-label">RAW DICTATION</div>
+    <div class="pane-header">
+      <div class="pane-label">RAW DICTATION</div>
+      <button class="pane-copy-btn" onclick="copyRaw()" title="Copy raw text">COPY</button>
+    </div>
     <div class="pane-wrapper raw-pane">
       <div class="transcript-scroll" id="rawScroll">
         <div class="transcript-content" id="rawContent">
@@ -139,7 +142,10 @@
     <div class="pane-divider" id="paneDivider"></div>
 
     <!-- Refined output pane -->
-    <div class="pane-label refined" id="refinedLabel">AI-CORRECTED OUTPUT</div>
+    <div class="pane-header">
+      <div class="pane-label refined" id="refinedLabel">AI-CORRECTED OUTPUT</div>
+      <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
+    </div>
     <div class="pane-wrapper refined-pane">
       <div class="transcript-scroll" id="refinedScroll">
         <div class="transcript-content" id="refinedContent">
