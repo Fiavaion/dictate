@@ -971,8 +971,8 @@ function showServerSetup() {
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:0.75rem;line-height:1.8;color:var(--accent)">
           <div style="color:var(--dim);margin-bottom:6px"># 1. Install Python 3.8+</div>
           <div style="color:var(--dim);margin-bottom:6px"># 2. Clone the repo</div>
-          <div>git clone https://github.com/Fiavaion/FiavaionDictate.git</div>
-          <div>cd FiavaionDictate</div>
+          <div>git clone https://github.com/Fiavaion/dictate.git</div>
+          <div>cd dictate</div>
           <div style="margin-top:8px">python server.py</div>
           <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:8080</div>
         </div>
