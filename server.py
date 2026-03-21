@@ -6,8 +6,35 @@ import os
 import pathlib
 import urllib.parse
 
-PROJECTS_ROOT = pathlib.Path(r"C:\Users\jones\AIprojects")
+DEFAULT_PROJECTS_ROOT = r"C:\Users\jones\AIprojects"
+CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
 PORT = 8080
+
+
+def _load_config():
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_config(cfg):
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+
+
+def get_projects_root():
+    cfg = _load_config()
+    return pathlib.Path(cfg.get("projectsRoot", DEFAULT_PROJECTS_ROOT))
+
+
+def set_projects_root(path_str):
+    p = pathlib.Path(path_str)
+    if not p.is_dir():
+        return False, "Directory does not exist"
+    cfg = _load_config()
+    cfg["projectsRoot"] = str(p)
+    _save_config(cfg)
+    return True, str(p)
 
 
 def _read_pkg(path):
@@ -61,10 +88,38 @@ def detect_stack(project_path):
     return ", ".join(deduped)
 
 
+def browse_directory(path_str):
+    """List subdirectories of a given path for the folder browser."""
+    p = pathlib.Path(path_str) if path_str else pathlib.Path.home()
+    if not p.is_dir():
+        return None, "Directory does not exist"
+    dirs = []
+    try:
+        for entry in sorted(p.iterdir(), key=lambda e: e.name.lower()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+            dirs.append(entry.name)
+    except PermissionError:
+        pass
+    parent = str(p.parent) if p.parent != p else None
+    return {"path": str(p), "parent": parent, "dirs": dirs}, None
+
+
+def get_drive_roots():
+    """Return available drive letters on Windows."""
+    import string
+    roots = []
+    for letter in string.ascii_uppercase:
+        drive = pathlib.Path(f"{letter}:\\")
+        if drive.exists():
+            roots.append(str(drive))
+    return roots
+
+
 def get_projects():
     results = []
     try:
-        for entry in PROJECTS_ROOT.iterdir():
+        for entry in get_projects_root().iterdir():
             if not entry.is_dir() or entry.name.startswith("."):
                 continue
             try:
@@ -83,19 +138,55 @@ def get_projects():
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    def _json_response(self, code, data):
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/projects":
-            data = get_projects()
-            body = json.dumps(data).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(body)
+            self._json_response(200, get_projects())
+        elif parsed.path == "/api/projects-root":
+            self._json_response(200, {"path": str(get_projects_root())})
+        elif parsed.path == "/api/browse":
+            qs = urllib.parse.parse_qs(parsed.query)
+            req_path = qs.get("path", [None])[0]
+            data, err = browse_directory(req_path)
+            if err:
+                self._json_response(400, {"error": err})
+            else:
+                data["drives"] = get_drive_roots()
+                self._json_response(200, data)
         else:
             super().do_GET()
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/projects-root":
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+            try:
+                data = json.loads(raw)
+            except Exception:
+                self._json_response(400, {"error": "Invalid JSON"})
+                return
+            path = data.get("path", "").strip()
+            if not path:
+                self._json_response(400, {"error": "Path is required"})
+                return
+            ok, msg = set_projects_root(path)
+            if ok:
+                self._json_response(200, {"path": msg})
+            else:
+                self._json_response(400, {"error": msg})
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def log_message(self, fmt, *args):
         pass  # suppress per-request noise

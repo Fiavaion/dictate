@@ -30,6 +30,8 @@ const state = {
   structuredPrompt: '',
   copyMenuOpen: false,
   autoSaveTimer: null,
+  structureView: false,
+  serverAvailable: true,
 };
 
 // ══════════════════════════════════════════
@@ -45,6 +47,115 @@ async function loadProjectSelector() {
   const settings = loadSettings();
   if (settings.activeProject && $('projectSelect')) {
     $('projectSelect').value = settings.activeProject;
+  }
+}
+
+// ══════════════════════════════════════════
+// Projects Folder
+// ══════════════════════════════════════════
+let currentProjectsRoot = '';
+let browserCurrentPath = '';
+
+async function loadProjectsRoot() {
+  try {
+    const res = await fetch('/api/projects-root');
+    if (!res.ok) return;
+    const data = await res.json();
+    currentProjectsRoot = data.path || '';
+  } catch { /* server unavailable */ }
+}
+
+async function openFolderBrowser() {
+  $('folderModal').style.display = 'flex';
+  await browseTo(currentProjectsRoot || null);
+}
+
+function closeFolderBrowser() {
+  $('folderModal').style.display = 'none';
+}
+
+async function browseTo(path) {
+  const url = path
+    ? '/api/browse?path=' + encodeURIComponent(path)
+    : '/api/browse';
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) { flashCmd('ERROR: ' + data.error); return; }
+    browserCurrentPath = data.path;
+    $('browserPath').textContent = data.path;
+
+    // Render drive buttons
+    const drivesEl = $('browserDrives');
+    drivesEl.innerHTML = '';
+    if (data.drives) {
+      for (const d of data.drives) {
+        const btn = document.createElement('button');
+        btn.className = 'folder-drive-btn';
+        btn.textContent = d;
+        btn.onclick = () => browseTo(d);
+        drivesEl.appendChild(btn);
+      }
+    }
+
+    // Render folder list
+    const listEl = $('browserList');
+    listEl.innerHTML = '';
+
+    // Parent directory entry
+    if (data.parent) {
+      const parentItem = document.createElement('div');
+      parentItem.className = 'folder-item folder-item-parent';
+      parentItem.innerHTML = '<span class="folder-item-icon">..</span> <span>Parent folder</span>';
+      parentItem.onclick = () => browseTo(data.parent);
+      listEl.appendChild(parentItem);
+    }
+
+    // Subdirectories
+    for (const name of data.dirs) {
+      const item = document.createElement('div');
+      item.className = 'folder-item';
+      item.innerHTML = `<span class="folder-item-icon">&#128193;</span> <span>${name}</span>`;
+      const sep = browserCurrentPath.includes('/') ? '/' : '\\';
+      const childPath = browserCurrentPath.replace(/[\\/]$/, '') + sep + name;
+      item.ondblclick = () => browseTo(childPath);
+      item.onclick = () => {
+        // Single click highlights, updates path display
+        listEl.querySelectorAll('.folder-item').forEach(el => el.style.background = '');
+        item.style.background = 'color-mix(in srgb, var(--accent2) 20%, var(--panel))';
+        $('browserPath').textContent = childPath;
+      };
+      listEl.appendChild(item);
+    }
+
+    if (data.dirs.length === 0 && !data.parent) {
+      listEl.innerHTML = '<div class="folder-item" style="color:var(--muted);cursor:default">No subdirectories</div>';
+    }
+  } catch {
+    flashCmd('ERROR: SERVER UNAVAILABLE');
+  }
+}
+
+async function selectBrowserFolder() {
+  const selectedPath = $('browserPath').textContent.trim();
+  if (!selectedPath) return;
+  try {
+    const res = await fetch('/api/projects-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: selectedPath }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      flashCmd('ERROR: ' + (data.error || 'Invalid path'));
+      return;
+    }
+    currentProjectsRoot = data.path;
+    closeFolderBrowser();
+    await loadProjectSelector();
+    flashCmd('PROJECTS FOLDER: ' + data.path);
+  } catch {
+    flashCmd('ERROR: SERVER UNAVAILABLE');
   }
 }
 
@@ -186,21 +297,24 @@ const promptStructurer = new PromptStructurer(ollamaClient, {
   model: 'mistral:7b-instruct',
   onStructureStart: () => {
     setAIStatus('thinking');
-    $('structuredOutput').textContent = '';
+    state.structureView = true;
+    $('refinedLabel').textContent = 'STRUCTURED PROMPT';
+    $('refinedLabel').classList.add('structured');
+    $('btnStructure')?.classList.add('active');
+    $('refinedContent').innerHTML = '';
   },
   onStructureToken: (text) => {
-    $('structuredOutput').textContent = text;
-    const el = $('structuredOutput');
-    el.scrollTop = el.scrollHeight;
+    renderStructuredInPane(text);
   },
   onStructureDone: (text) => {
     state.structuredPrompt = text;
     setAIStatus('connected');
+    renderStructuredInPane(text);
     autoSave();
   },
   onError: (err) => {
     console.warn('Structure error:', err);
-    $('structuredOutput').textContent = 'Error: ' + err;
+    $('refinedContent').innerHTML = `<span class="placeholder">Error: ${escapeHtml(err)}</span>`;
     setAIStatus('connected');
   },
 });
@@ -214,9 +328,15 @@ commandParser.onFlash = (msg, count) => {
   flashCmd(msg);
   $('cmdCount').textContent = count;
 };
-commandParser.onTranscriptChange = () => {
+commandParser.onTranscriptChange = (newText) => {
   renderTranscript();
   updateStats();
+  // If transcript was cleared, reset correction pipeline and refined pane
+  if (!newText) {
+    correctionPipeline.reset();
+    renderRefined('');
+    renderCorrections([]);
+  }
 };
 commandParser.onStopRecording = () => stopRecording();
 commandParser.onStartRecording = () => startRecording();
@@ -332,9 +452,8 @@ async function startRecording() {
 
   if (!audioCtx) await startAudio();
 
-  const prof = PROFILES[state.currentProfile];
   sttEngine.setLang($('langSelect').value);
-  sttEngine.setMaxAlternatives(prof.maxAlts);
+  sttEngine.setMaxAlternatives(1);
   sttEngine.start(vocab.allHints);
 
   state.isRecording = true;
@@ -378,9 +497,11 @@ function clearAll() {
   updateStats();
   updateConfidence(0);
   renderTranscript();
+  state.structureView = false;
+  $('refinedLabel').textContent = 'AI-CORRECTED OUTPUT';
+  $('refinedLabel').classList.remove('structured');
   renderRefined('');
   renderCorrections([]);
-  $('structuredOutput').textContent = '';
   clearSession();
 
   const el = $('rawContent');
@@ -432,6 +553,12 @@ function renderTranscript() {
 }
 
 function renderRefined(text) {
+  // Switch back from structure view when new corrections arrive
+  if (state.structureView) {
+    state.structureView = false;
+    $('refinedLabel').textContent = 'AI-CORRECTED OUTPUT';
+    $('refinedLabel').classList.remove('structured');
+  }
   const el = $('refinedContent');
   if (!text) {
     el.innerHTML = '<span class="placeholder">AI-corrected text will appear here\u2026</span>';
@@ -552,7 +679,31 @@ function toggleDiffView() {
   }
 }
 
+function renderStructuredInPane(text) {
+  const el = $('refinedContent');
+  const paragraphs = text.split('\n');
+  el.innerHTML = paragraphs.map(line =>
+    `<span class="final-text structured-line">${escapeHtml(line)}</span>`
+  ).join('<br>');
+  const scroll = $('refinedScroll');
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function exitStructureView() {
+  state.structureView = false;
+  $('refinedLabel').textContent = 'AI-CORRECTED OUTPUT';
+  $('refinedLabel').classList.remove('structured');
+  $('btnStructure')?.classList.remove('active');
+  // Restore the corrected text
+  renderRefined(correctionPipeline.correctedText || '');
+}
+
 async function doStructure() {
+  // If already in structure view with content, toggle back to corrected view
+  if (state.structureView && state.structuredPrompt) {
+    exitStructureView();
+    return;
+  }
   const text = correctionPipeline.correctedText || state.rawTranscript;
   if (!text.trim()) { flashCmd('NOTHING TO STRUCTURE'); return; }
   await promptStructurer.structure(text);
@@ -704,7 +855,6 @@ function restoreSession() {
   // Render
   renderTranscript();
   if (session.refinedTranscript) renderRefined(session.refinedTranscript);
-  if (session.structuredPrompt) $('structuredOutput').textContent = session.structuredPrompt;
   updateStats();
   renderTemplateSelector();
 
@@ -775,6 +925,70 @@ $('langSelect').addEventListener('change', () => {
   sttEngine.setLang($('langSelect').value);
   if (state.isRecording) { stopRecording(); setTimeout(startRecording, 200); }
 });
+
+// ══════════════════════════════════════════
+// Server mode detection
+// ══════════════════════════════════════════
+async function detectServerMode() {
+  try {
+    const res = await fetch('/api/projects-root');
+    if (res.ok) {
+      state.serverAvailable = true;
+      return;
+    }
+  } catch { /* server not running */ }
+  state.serverAvailable = false;
+  // Hide project selector and folder button — they need the server
+  const wrap = $('projectSelectorWrap');
+  if (wrap) wrap.style.display = 'none';
+  // Show a setup hint in header
+  const hint = document.createElement('button');
+  hint.className = 'btn-secondary server-hint';
+  hint.innerHTML = 'LOCAL SERVER';
+  hint.title = 'Run server.py for project management & folder browsing';
+  hint.onclick = showServerSetup;
+  $('app')?.querySelector('header .header-right')?.prepend(hint);
+}
+
+function showServerSetup() {
+  const modal = document.createElement('div');
+  modal.className = 'folder-modal-overlay';
+  modal.id = 'serverModal';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="folder-modal" style="width:480px">
+      <div class="folder-modal-header">
+        <span class="folder-modal-title">LOCAL SERVER SETUP</span>
+        <button class="folder-modal-close" onclick="document.getElementById('serverModal').remove()">&times;</button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+        <p style="font-family:var(--body);font-size:0.82rem;color:var(--text);line-height:1.6">
+          The local server enables <strong style="color:var(--accent2)">project management</strong>,
+          <strong style="color:var(--accent2)">folder browsing</strong>, and
+          <strong style="color:var(--accent2)">AI correction via Ollama</strong>.
+          Dictation works without it.
+        </p>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:0.75rem;line-height:1.8;color:var(--accent)">
+          <div style="color:var(--dim);margin-bottom:6px"># 1. Install Python 3.8+</div>
+          <div style="color:var(--dim);margin-bottom:6px"># 2. Clone the repo</div>
+          <div>git clone https://github.com/Fiavaion/FiavaionDictate.git</div>
+          <div>cd FiavaionDictate</div>
+          <div style="margin-top:8px">python server.py</div>
+          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:8080</div>
+        </div>
+        <p style="font-family:var(--body);font-size:0.72rem;color:var(--muted);line-height:1.5">
+          For AI features, also install <a href="https://ollama.com" target="_blank" style="color:var(--ai-glow)">Ollama</a> and pull a model:<br>
+          <code style="color:var(--accent);font-family:var(--mono);font-size:0.7rem">ollama pull gemma3:4b</code>
+        </p>
+      </div>
+      <div class="folder-modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('serverModal').remove()">CLOSE</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+window.showServerSetup = showServerSetup;
 
 // ══════════════════════════════════════════
 // Init
@@ -883,8 +1097,19 @@ function init() {
     };
   }
 
-  // Load project list (async — non-blocking)
+  // Folder browser modal
+  $('btnSetFolder').onclick = openFolderBrowser;
+  $('btnCloseBrowser').onclick = closeFolderBrowser;
+  $('btnBrowserCancel').onclick = closeFolderBrowser;
+  $('btnBrowserSelect').onclick = selectBrowserFolder;
+  $('folderModal').onclick = (e) => { if (e.target === $('folderModal')) closeFolderBrowser(); };
+
+  // Load projects root path and project list (async — non-blocking)
+  loadProjectsRoot();
   loadProjectSelector();
+
+  // Detect if running without local server (e.g. GitHub Pages)
+  detectServerMode();
 }
 
 // ══════════════════════════════════════════
@@ -900,6 +1125,7 @@ window.copyStructured = copyStructured;
 window.copyToClaude = copyToClaude;
 window.toggleCopyMenu = toggleCopyMenu;
 window.doStructure = doStructure;
+window.exitStructureView = exitStructureView;
 
 // Boot
 init();

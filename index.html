@@ -97,6 +97,9 @@
           <option value="">— Project —</option>
         </select>
         <button class="btn-sort" id="btnSortProjects" title="Sort: Recent first">&#9201;</button>
+        <button class="btn-sort" id="btnSetFolder" title="Set projects folder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
       </div>
 
       <select class="ui-select" id="langSelect">
@@ -136,7 +139,7 @@
     <div class="pane-divider" id="paneDivider"></div>
 
     <!-- Refined output pane -->
-    <div class="pane-label refined">AI-CORRECTED OUTPUT</div>
+    <div class="pane-label refined" id="refinedLabel">AI-CORRECTED OUTPUT</div>
     <div class="pane-wrapper refined-pane">
       <div class="transcript-scroll" id="refinedScroll">
         <div class="transcript-content" id="refinedContent">
@@ -162,15 +165,6 @@
       <div class="template-selector" id="templateSelector"></div>
     </div>
 
-    <!-- Structured output -->
-    <div>
-      <div class="ai-section-title">STRUCTURED PROMPT</div>
-      <div class="structured-output" id="structuredOutput"></div>
-      <div class="ai-actions" style="margin-top:8px">
-        <button class="ai-action-btn primary" onclick="doStructure()">STRUCTURE</button>
-        <button class="ai-action-btn" onclick="copyStructured()">COPY</button>
-      </div>
-    </div>
 
     <!-- Settings -->
     <div>
@@ -205,7 +199,7 @@
       <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
       <button class="btn-secondary" onclick="toggleCmdPanel()">COMMANDS</button>
       <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">AI PANEL</button>
-      <button class="btn-secondary" onclick="doStructure()">STRUCTURE</button>
+      <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
 
       <span class="kbd-hint">
         <kbd>SPACE</kbd> toggle &nbsp;&middot;&nbsp;
@@ -238,6 +232,25 @@
       </div>
     </div>
   </footer>
+</div>
+
+<!-- ══════ Folder Browser Modal ══════ -->
+<div class="folder-modal-overlay" id="folderModal" style="display:none">
+  <div class="folder-modal">
+    <div class="folder-modal-header">
+      <span class="folder-modal-title">SELECT PROJECTS FOLDER</span>
+      <button class="folder-modal-close" id="btnCloseBrowser">&times;</button>
+    </div>
+    <div class="folder-modal-path" id="browserPath"></div>
+    <div class="folder-modal-drives" id="browserDrives"></div>
+    <div class="folder-modal-list" id="browserList"></div>
+    <div class="folder-modal-footer">
+      <button class="btn-secondary" id="btnBrowserCancel">CANCEL</button>
+      <button class="btn-mic" id="btnBrowserSelect" style="padding:8px 24px;font-size:0.75rem">
+        <span>USE THIS FOLDER</span>
+      </button>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="js/app.js"></script>
