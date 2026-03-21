@@ -1349,7 +1349,7 @@ function handleImportFile(e) {
 // Keyboard
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
   if (e.code === 'Space')  { e.preventDefault(); toggleRecording(); }
   if (e.code === 'Escape') {
@@ -1486,7 +1486,7 @@ promptBuilder.onSave = (key, template) => {
 
 function openPromptBuilder(templateKey = null) {
   // Default to the currently active template so the user sees real data
-  const key = templateKey || state.activeTemplate || 'freeform';
+  const key = templateKey || promptStructurer.currentTemplate || 'freeform';
   promptBuilder.open(key);
 }
 
