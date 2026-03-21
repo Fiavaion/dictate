@@ -7,10 +7,11 @@ import { WebSpeechEngine } from './stt/web-speech-engine.js';
 import { AutoPunctuation } from './stt/auto-punctuation.js';
 import { VocabularyManager } from './stt/vocabulary-manager.js';
 import { CommandParser } from './stt/command-parser.js';
-import { OllamaClient } from './ai/ollama-client.js';
+import { AIClient } from './ai/ai-client.js';
 import { CorrectionPipeline } from './ai/correction-pipeline.js';
 import { PromptStructurer } from './ai/prompt-structurer.js';
 import { getAllTemplates } from './ai/prompt-templates.js';
+import { APISettingsModal } from './ui/api-settings.js';
 import { copyToClipboard } from './utils/clipboard.js';
 import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
   loadSessionsIndex, saveSessionToList, loadSavedSession, deleteSessionFromList,
@@ -232,7 +233,8 @@ const $ = id => document.getElementById(id);
 const vocab = new VocabularyManager();
 const autoPunct = new AutoPunctuation('auto');
 const commandParser = new CommandParser();
-const ollamaClient = new OllamaClient();
+const aiClient = new AIClient();
+const apiSettingsModal = new APISettingsModal(aiClient);
 
 const sttEngine = new WebSpeechEngine({
   lang: 'en-US',
@@ -274,7 +276,7 @@ const sttEngine = new WebSpeechEngine({
   },
 });
 
-const correctionPipeline = new CorrectionPipeline(ollamaClient, {
+const correctionPipeline = new CorrectionPipeline(aiClient, {
   model: 'gemma3:4b',
   debounceMs: 600,
   onCorrectionStart: () => {
@@ -297,7 +299,7 @@ const correctionPipeline = new CorrectionPipeline(ollamaClient, {
   },
 });
 
-const promptStructurer = new PromptStructurer(ollamaClient, {
+const promptStructurer = new PromptStructurer(aiClient, {
   model: 'mistral:7b-instruct',
   onStructureStart: () => {
     setAIStatus('thinking');
@@ -885,14 +887,14 @@ function renderModelSelector() {
   const select = $('modelSelect');
   if (!select) return;
   select.innerHTML = '';
-  if (!ollamaClient.models.length) {
+  if (!aiClient.models.length) {
     const opt = document.createElement('option');
     opt.value = '';
     opt.textContent = 'No models';
     select.appendChild(opt);
     return;
   }
-  for (const m of ollamaClient.models) {
+  for (const m of aiClient.models) {
     const opt = document.createElement('option');
     opt.value = m.name;
     opt.textContent = `${m.name} (${m.size})`;
@@ -1403,16 +1405,22 @@ function init() {
   state.aiPanelOpen = false;
 
   // Connect to Ollama
-  ollamaClient.startMonitoring(10000, (connected, models) => {
+  aiClient.startMonitoring(10000, (connected, models) => {
     if (connected) {
       setAIStatus('connected');
       renderModelSelector();
-      // Warmup the correction model
-      ollamaClient.warmup(correctionPipeline.model);
+      aiClient.warmup(correctionPipeline.model);
     } else {
       setAIStatus('offline');
     }
   });
+
+  // AI Settings modal
+  apiSettingsModal.render();
+  const btnAISettings = $('btnAISettings');
+  if (btnAISettings) {
+    btnAISettings.onclick = () => apiSettingsModal.open();
+  }
 
   // Auto-correct toggle
   const aiToggle = $('aiToggle');
@@ -1527,6 +1535,7 @@ window.onDeleteSession = onDeleteSession;
 window.onRenameSession = onRenameSession;
 window.onExportSessions = onExportSessions;
 window.onImportSessions = onImportSessions;
+window.openAISettings = () => apiSettingsModal.open();
 
 // Boot
 init();

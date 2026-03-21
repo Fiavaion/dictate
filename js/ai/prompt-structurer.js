@@ -5,7 +5,7 @@
 
 import { getAllTemplates, TEMPLATES } from './prompt-templates.js';
 
-const STRUCTURER_SYSTEM = `You are a prompt engineering specialist for Claude Code, an AI coding assistant in VS Code. Transform the user's raw dictation into a well-structured, effective prompt.
+const BASE_SYSTEM_PROMPT = `You are a prompt engineering specialist for Claude Code, an AI coding assistant in VS Code. Transform the user's raw dictation into a well-structured, effective prompt.
 
 Rules:
 1. Use markdown formatting: ## headers, bullet points, backticks for code/paths
@@ -43,15 +43,70 @@ export class PromptStructurer {
     return false;
   }
 
+  /** Build system prompt, merging base with template overrides and constraints */
+  _buildSystemPrompt(template) {
+    let system = BASE_SYSTEM_PROMPT;
+
+    if (template.systemPrompt) {
+      system += `\n\n${template.systemPrompt}`;
+    }
+
+    if (template.constraints) {
+      system += `\n\nOutput constraints: ${template.constraints}`;
+    }
+
+    return system;
+  }
+
+  /** Build user prompt with template instruction, few-shot examples, and text */
+  _buildUserPrompt(text, template) {
+    let prompt = template.instruction;
+
+    if (template.examples && template.examples.length > 0) {
+      prompt += '\n';
+      for (const ex of template.examples) {
+        prompt += `\n\nExample input:\n${ex.input}\n\nExample output:\n${ex.output}`;
+      }
+    }
+
+    let contextBlock = '';
+    if (this.projectContext) contextBlock += `\nProject: ${this.projectContext}`;
+    if (this.stackContext) contextBlock += `\nTech stack: ${this.stackContext}`;
+    if (contextBlock) prompt += contextBlock;
+
+    prompt += `\n\nRaw dictation:\n${text}`;
+
+    return prompt;
+  }
+
+  /** Strip common LLM artifacts from structured output */
+  _stripArtifacts(text) {
+    let result = text;
+
+    // Strip markdown code fences if the entire output is wrapped
+    const fenceMatch = result.match(/^```(?:\w*)\n([\s\S]*?)\n```\s*$/);
+    if (fenceMatch) {
+      result = fenceMatch[1];
+    }
+
+    // Strip leading preamble lines
+    const preamblePattern = /^(?:Here's|Here is|Sure|I'll|Below is)[^\n]*\n+/i;
+    result = result.replace(preamblePattern, '');
+
+    // Strip trailing explanatory paragraphs
+    result = result.replace(/\n\n(?:Note:|This prompt)[^\n]*(?:\n[^\n#-][^\n]*)*\s*$/i, '');
+
+    return result.trim();
+  }
+
   /** Structure the given text using the current template */
   async structure(text) {
     if (!text.trim()) return '';
     if (!this.client.connected) {
-      this.onError?.('Ollama not connected');
+      this.onError?.('AI not connected');
       return '';
     }
 
-    // Cancel any in-flight structuring
     if (this._abortController) this._abortController.abort();
     this._abortController = new AbortController();
     this._structuring = true;
@@ -61,16 +116,16 @@ export class PromptStructurer {
       const all = getAllTemplates();
       const template = all[this.currentTemplate] || TEMPLATES.freeform;
 
-      let contextBlock = '';
-      if (this.projectContext) contextBlock += `\nProject: ${this.projectContext}`;
-      if (this.stackContext) contextBlock += `\nTech stack: ${this.stackContext}`;
+      const systemPrompt = this._buildSystemPrompt(template);
+      const userPrompt = this._buildUserPrompt(text, template);
 
-      const prompt = `${STRUCTURER_SYSTEM}\n\n${template.instruction}${contextBlock}\n\nRaw dictation:\n${text}`;
+      const maxTokens = template.parameters?.maxTokens || 1200;
+      const temperature = template.parameters?.temperature || 0.3;
 
       let structured = '';
       for await (const { token, done } of this.client.generate(
-        this.model, prompt,
-        { num_predict: 800, temperature: 0.3 },
+        this.model, userPrompt, systemPrompt,
+        { num_predict: maxTokens, temperature },
         this._abortController.signal
       )) {
         structured += token;
@@ -78,7 +133,7 @@ export class PromptStructurer {
         if (done) break;
       }
 
-      structured = structured.trim();
+      structured = this._stripArtifacts(structured);
       this.onStructureDone?.(structured);
       return structured;
     } catch (e) {
