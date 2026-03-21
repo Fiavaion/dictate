@@ -1485,7 +1485,9 @@ promptBuilder.onSave = (key, template) => {
 };
 
 function openPromptBuilder(templateKey = null) {
-  promptBuilder.open(templateKey);
+  // Default to the currently active template so the user sees real data
+  const key = templateKey || state.activeTemplate || 'freeform';
+  promptBuilder.open(key);
 }
 
 // ── Ambient Detector ──

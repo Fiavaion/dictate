@@ -66,10 +66,19 @@ export class PromptBuilder {
     this._injectStyles();
     this.render();
 
-    if (templateKey) {
+    // Always populate the template selector
+    this._renderTemplateSelector();
+
+    // Load template data into fields
+    const loadKey = templateKey || null;
+    if (loadKey) {
       const all = getAllTemplates();
-      const t = all[templateKey];
-      if (t) this._populateFromTemplate(templateKey, t);
+      const t = all[loadKey];
+      if (t) {
+        this._populateFromTemplate(loadKey, t);
+        // Select it in the dropdown
+        if (this._templateSelect) this._templateSelect.value = loadKey;
+      }
     }
 
     document.body.appendChild(this._el);
@@ -132,28 +141,111 @@ export class PromptBuilder {
     const header = document.createElement('div');
     header.className = 'prompt-builder-header';
 
-    // Name input
+    // Template selector row
+    const selectorRow = document.createElement('div');
+    selectorRow.className = 'pb-selector-row';
+
+    const selectorLabel = document.createElement('span');
+    selectorLabel.className = 'pb-selector-label';
+    selectorLabel.textContent = 'LOAD TEMPLATE';
+    selectorRow.appendChild(selectorLabel);
+
+    this._templateSelect = document.createElement('select');
+    this._templateSelect.className = 'pb-template-select';
+    selectorRow.appendChild(this._templateSelect);
+
+    header.appendChild(selectorRow);
+
+    // Name input row
+    const nameRow = document.createElement('div');
+    nameRow.className = 'pb-name-row';
+
     this._nameInput = document.createElement('input');
     this._nameInput.type = 'text';
     this._nameInput.className = 'pb-name-input';
     this._nameInput.placeholder = 'Template Name';
     this._nameInput.addEventListener('input', () => this._updateKeyBadge());
-    header.appendChild(this._nameInput);
+    nameRow.appendChild(this._nameInput);
 
     // Key badge
     this._keyBadge = document.createElement('span');
     this._keyBadge.className = 'pb-key-badge';
     this._keyBadge.textContent = 'key: ...';
-    header.appendChild(this._keyBadge);
+    nameRow.appendChild(this._keyBadge);
 
     // Close button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'folder-modal-close';
     closeBtn.innerHTML = '&times;';
     closeBtn.addEventListener('click', () => this.close());
-    header.appendChild(closeBtn);
+    nameRow.appendChild(closeBtn);
+
+    header.appendChild(nameRow);
 
     return header;
+  }
+
+  /** Populate the template dropdown and wire change handler. */
+  _renderTemplateSelector() {
+    if (!this._templateSelect) return;
+
+    const all = getAllTemplates();
+    this._templateSelect.innerHTML = '';
+
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '— New blank template —';
+    this._templateSelect.appendChild(blank);
+
+    for (const [key, tmpl] of Object.entries(all)) {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = tmpl.label || key;
+      this._templateSelect.appendChild(opt);
+    }
+
+    this._templateSelect.addEventListener('change', () => {
+      const key = this._templateSelect.value;
+      if (!key) {
+        // Reset to blank
+        this._editingKey = null;
+        this._clearFields();
+        return;
+      }
+      const tmpl = all[key];
+      if (tmpl) {
+        this._editingKey = key;
+        this._populateFromTemplate(key, tmpl);
+      }
+    });
+  }
+
+  /** Clear all fields to blank state. */
+  _clearFields() {
+    this._nameInput.value = '';
+    this._updateKeyBadge();
+    if (!this._sectionsEl) return;
+
+    // Clear textareas
+    this._sectionsEl.querySelectorAll('textarea[data-field]').forEach(ta => { ta.value = ''; });
+
+    // Clear examples
+    const list = this._sectionsEl.querySelector('.pb-examples-list');
+    if (list) list.innerHTML = '';
+
+    // Reset sliders
+    const tempSlider = this._sectionsEl.querySelector('input[data-param="temperature"]');
+    const tokSlider = this._sectionsEl.querySelector('input[data-param="maxTokens"]');
+    if (tempSlider) {
+      tempSlider.value = '0.3';
+      const v = tempSlider.parentElement.querySelector('.pb-slider-value');
+      if (v) v.textContent = '0.3';
+    }
+    if (tokSlider) {
+      tokSlider.value = '800';
+      const v = tokSlider.parentElement.querySelector('.pb-slider-value');
+      if (v) v.textContent = '800';
+    }
   }
 
   _updateKeyBadge() {
@@ -642,7 +734,7 @@ export class PromptBuilder {
     }
 
     if (!this._client || !this._client.connected) {
-      this._previewOutput.textContent = 'Ollama is not connected. Start Ollama and try again.';
+      this._previewOutput.textContent = 'AI is not connected. Check your provider settings and try again.';
       this._previewOutput.classList.remove('has-content');
       return;
     }
@@ -665,7 +757,7 @@ export class PromptBuilder {
 
     try {
       const template = this._buildTemplateFromUI();
-      const prompt = this._buildPrompt(template, sampleText);
+      const { systemPrompt, userPrompt } = this._buildPromptParts(template, sampleText);
       const model = this._getSelectedModel();
       const options = {
         temperature: template.parameters.temperature,
@@ -677,7 +769,7 @@ export class PromptBuilder {
       this._previewOutput.classList.add('has-content');
 
       for await (const { token, done } of this._client.generate(
-        model, prompt, options, this._abortController.signal
+        model, userPrompt, systemPrompt, options, this._abortController.signal
       )) {
         output += token;
         this._previewOutput.textContent = output;
@@ -702,23 +794,22 @@ export class PromptBuilder {
     }
   }
 
-  /** Build the full prompt from template config + sample text. */
-  _buildPrompt(template, sampleText) {
+  /**
+   * Build separated system and user prompts from template config + sample text.
+   * @returns {{ systemPrompt: string, userPrompt: string }}
+   */
+  _buildPromptParts(template, sampleText) {
+    // System prompt
+    const systemPrompt = template.systemPrompt || 'You are a text formatting assistant. Transform raw dictation into the requested format.';
+
+    // User prompt
     const parts = [];
 
-    // System prompt
-    if (template.systemPrompt) {
-      parts.push(template.systemPrompt);
-      parts.push('');
-    }
-
-    // Instruction
     if (template.instruction) {
       parts.push(template.instruction);
       parts.push('');
     }
 
-    // Few-shot examples
     if (template.examples && template.examples.length > 0) {
       parts.push('Examples:');
       template.examples.forEach((ex, i) => {
@@ -729,16 +820,14 @@ export class PromptBuilder {
       parts.push('');
     }
 
-    // Constraints
     if (template.constraints) {
       parts.push(`Output constraints: ${template.constraints}`);
       parts.push('');
     }
 
-    // The actual input
     parts.push(`Raw dictation:\n${sampleText}`);
 
-    return parts.join('\n');
+    return { systemPrompt, userPrompt: parts.join('\n') };
   }
 
   _cancelTest() {

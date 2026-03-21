@@ -11,13 +11,46 @@
   min-height: 500px;
 }
 
-/* ── Header: template name + key ── */
+/* ── Header: template selector + name + key ── */
 .prompt-builder-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.pb-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pb-selector-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.pb-template-select {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  padding: 5px 8px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.pb-template-select:focus {
+  border-color: var(--ai-glow);
+}
+.pb-name-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--border);
 }
 .pb-name-input {
   flex: 1;
