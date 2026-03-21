@@ -15,19 +15,20 @@ const PROVIDERS = {
   },
   anthropic: {
     label: 'Anthropic',
-    defaultModel: 'claude-haiku-4-20250414',
+    defaultModel: 'claude-haiku-4-5-latest',
     models: [
-      { name: 'claude-haiku-4-20250414', label: 'Claude Haiku 4' },
-      { name: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+      { name: 'claude-haiku-4-5-latest', label: 'Claude Haiku' },
+      { name: 'claude-sonnet-4-5-latest', label: 'Claude Sonnet' },
+      { name: 'claude-opus-4-latest', label: 'Claude Opus' },
     ],
     local: false,
   },
   openai: {
     label: 'OpenAI',
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-4o-mini',
     models: [
-      { name: 'gpt-4o', label: 'GPT-4o' },
       { name: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { name: 'gpt-4o', label: 'GPT-4o' },
       { name: 'gpt-4.1', label: 'GPT-4.1' },
     ],
     local: false,
@@ -36,8 +37,8 @@ const PROVIDERS = {
     label: 'Google',
     defaultModel: 'gemini-2.0-flash',
     models: [
-      { name: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      { name: 'gemini-2.5-pro-preview-06-05', label: 'Gemini 2.5 Pro' },
+      { name: 'gemini-2.0-flash', label: 'Gemini Flash' },
+      { name: 'gemini-2.5-pro', label: 'Gemini Pro' },
     ],
     local: false,
   },
@@ -151,13 +152,13 @@ export class AIClient {
     if (this._provider === 'ollama') {
       const ok = await this._ollamaClient.checkConnection();
       this._providerModels.ollama = this._ollamaClient.models;
-      return ok;
+      return ok ? { ok: true } : { ok: false, error: 'Cannot reach Ollama' };
     }
 
     const apiKey = this.getApiKey(this._provider);
     if (!apiKey) {
       this._connected = false;
-      return false;
+      return { ok: false, error: 'No API key provided' };
     }
 
     try {
@@ -176,10 +177,21 @@ export class AIClient {
         signal: AbortSignal.timeout(15000),
       });
       this._connected = res.ok;
-      return res.ok;
-    } catch {
+      if (res.ok) return { ok: true };
+      // Extract error detail from proxy response
+      try {
+        const body = await res.json();
+        const raw = body.error || '';
+        // Try to parse nested JSON error (e.g. from Anthropic)
+        try {
+          const nested = JSON.parse(raw);
+          const msg = nested?.error?.message || raw;
+          return { ok: false, error: msg };
+        } catch { return { ok: false, error: raw || `HTTP ${res.status}` }; }
+      } catch { return { ok: false, error: `HTTP ${res.status}` }; }
+    } catch (e) {
       this._connected = false;
-      return false;
+      return { ok: false, error: e.name === 'TimeoutError' ? 'Request timed out' : (e.message || 'Network error') };
     }
   }
 

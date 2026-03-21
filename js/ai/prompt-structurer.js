@@ -1,18 +1,17 @@
 /**
  * Prompt Structurer — on-demand transformation of dictated text
- * into structured Claude Code prompts using Ollama.
+ * into polished written text using the active template.
  */
 
 import { getAllTemplates, TEMPLATES } from './prompt-templates.js';
 
-const BASE_SYSTEM_PROMPT = `You are a prompt engineering specialist for Claude Code, an AI coding assistant in VS Code. Transform the user's raw dictation into a well-structured, effective prompt.
+const BASE_SYSTEM_PROMPT = `You are a dictation processing assistant. Transform the user's raw spoken text into polished written text according to the template instructions provided.
 
 Rules:
-1. Use markdown formatting: ## headers, bullet points, backticks for code/paths
-2. Be specific: convert vague references to concrete terms
-3. Keep it concise — Claude Code works best with clear, focused prompts
-4. Do not add information that wasn't in the original dictation
-5. Return ONLY the structured prompt, no preamble or explanation`;
+1. Follow the template's tone and formatting instructions precisely
+2. Do not add information that wasn't in the original dictation
+3. Fix dictation artifacts: filler words, false starts, repetitions
+4. Return ONLY the processed text, no preamble or explanation`;
 
 export class PromptStructurer {
   constructor(ollamaClient, options = {}) {

@@ -651,7 +651,7 @@ function renderTranscript() {
       const newPh = document.createElement('span');
       newPh.className = 'placeholder';
       newPh.id = 'placeholder';
-      newPh.textContent = 'Press SPACE or click START to begin dictating\u2026';
+      newPh.textContent = 'Press SPACE or click START to begin dictating, or paste text here\u2026';
       el.appendChild(newPh);
     } else {
       el.appendChild(ph);
@@ -850,9 +850,9 @@ function exitStructureView() {
   renderRefined(correctionPipeline.correctedText || '');
 }
 
-async function doStructure() {
-  // If already in structure view with content, toggle back to corrected view
-  if (state.structureView && state.structuredPrompt) {
+async function doStructure({ force = false } = {}) {
+  // If already in structure view with content, toggle back (unless forced re-gen)
+  if (!force && state.structureView && state.structuredPrompt) {
     exitStructureView();
     return;
   }
@@ -992,6 +992,9 @@ function renderTemplateSelector() {
       promptStructurer.setTemplate(key);
       renderTemplateSelector();
       _saveCurrentProjectSettings();
+      // Auto-structure when switching templates if there's text
+      const text = correctionPipeline.correctedText || state.rawTranscript;
+      if (text.trim()) doStructure({ force: true });
     };
     container.appendChild(btn);
   }
@@ -1391,6 +1394,39 @@ document.addEventListener('click', e => {
     $('copyDropdown')?.classList.remove('show');
   }
 });
+
+// ══════════════════════════════════════════
+// Paste / manual edit in raw pane
+// ══════════════════════════════════════════
+(() => {
+  const raw = $('rawContent');
+  if (!raw) return;
+
+  raw.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    if (!text) return;
+
+    // Append to existing transcript (or replace if empty)
+    const separator = state.rawTranscript ? '\n\n' : '';
+    state.rawTranscript += separator + text;
+
+    // Feed to correction pipeline
+    correctionPipeline.onNewText(text);
+
+    renderTranscript();
+    updateStats();
+    flashCmd('PASTED');
+  });
+
+  raw.addEventListener('input', () => {
+    // Sync manual edits back to state (only when not mid-dictation)
+    if (state.isRecording) return;
+    const text = raw.innerText.replace(/\n{3,}/g, '\n\n').trim();
+    state.rawTranscript = text;
+    updateStats();
+  });
+})();
 
 // ══════════════════════════════════════════
 // Not Supported

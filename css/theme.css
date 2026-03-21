@@ -367,7 +367,8 @@ select.voice-select { min-width: 160px; max-width: 220px; }
   min-height: 40px;
 }
 
-.raw-pane .transcript-content { color: var(--text); opacity: 0.9; }
+.raw-pane .transcript-content { color: var(--text); opacity: 0.9; cursor: text; outline: none; }
+.raw-pane .transcript-content:focus { opacity: 1; }
 .refined-pane .transcript-content { color: var(--text); }
 
 .final-text  { color: inherit; }

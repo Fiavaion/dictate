@@ -174,12 +174,12 @@ export class APISettingsModal {
     statusEl.textContent = 'Testing connection...';
     statusEl.style.color = 'var(--muted)';
 
-    const ok = await this.client.checkConnection();
-    if (ok) {
+    const result = await this.client.checkConnection();
+    if (result.ok) {
       this._showStatus('Connected', 'var(--success)');
       if (this._activeTab === 'ollama') this._renderTab('ollama');
     } else {
-      this._showStatus('Connection failed', 'var(--danger)');
+      this._showStatus(result.error || 'Connection failed', 'var(--danger)');
     }
   }
 

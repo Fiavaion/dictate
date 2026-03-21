@@ -6,28 +6,27 @@
 
 import { applyJargonMap } from './jargon-map.js';
 
-const BASE_SYSTEM_PROMPT = `You are a text correction assistant for a developer dictation tool. The user dictates prompts for Claude Code (an AI coding assistant). Fix:
+const BASE_SYSTEM_PROMPT = `You are a text correction assistant for a dictation tool. Fix:
 - Spelling and grammar errors
 - Punctuation (add missing periods, commas)
 - Capitalize proper nouns and sentence starts
-- Preserve code blocks, file paths, URLs, and variable names exactly as dictated
+- Preserve specialized vocabulary, proper nouns, and technical terms exactly
 - Preserve paragraph breaks and list formatting
-- Preserve all technical terms, code references, and developer jargon exactly
 
 Do not add preamble like "Here is the corrected text:" — return ONLY the corrected text. No explanations, no quotes, no extra formatting. If the text is already correct, return it unchanged.`;
 
 const FEW_SHOT_EXAMPLES = [
   {
-    input: `so basically I need to update the use effect hook in the dashboard component to uh fetch the data from slash API slash metrics instead of the old endpoint and also add error handling`,
-    output: `So basically, I need to update the useEffect hook in the dashboard component to fetch the data from /api/metrics instead of the old endpoint, and also add error handling.`,
+    input: `so basically the meeting went well and uh they agreed to move forward with the proposal and the deadline is march fifteenth`,
+    output: `The meeting went well. They agreed to move forward with the proposal, and the deadline is March 15th.`,
   },
   {
-    input: `the problem is in the package dot json file the dependency for react router dom is pointing to version 5 but we need version 6 because the route component API changed`,
-    output: `The problem is in the package.json file. The dependency for react-router-dom is pointing to version 5, but we need version 6 because the Route component API changed.`,
+    input: `I want to tell sarah that the quarterly numbers are looking good and we should uh schedule a follow up for next week`,
+    output: `I want to tell Sarah that the quarterly numbers are looking good and we should schedule a follow-up for next week.`,
   },
   {
-    input: `I want to add a middleware function in the express server that checks if the authorization header has a valid jason web token before allowing access to the protected routes`,
-    output: `I want to add a middleware function in the Express server that checks if the Authorization header has a valid JSON Web Token before allowing access to the protected routes.`,
+    input: `the problem is in the package dot json file the dependency for react router dom is pointing to version 5 but we need version 6`,
+    output: `The problem is in the package.json file. The dependency for react-router-dom is pointing to version 5, but we need version 6.`,
   },
 ];
 
