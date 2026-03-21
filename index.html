@@ -6,6 +6,18 @@
 <title>FiavaionDictate — AI-Powered Dictation for Claude Code</title>
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/ai-panel.css">
+<link rel="stylesheet" href="css/prompt-builder.css">
+<style>
+  .ghost-text {
+    color: var(--dim);
+    opacity: 0.45;
+    font-style: italic;
+    pointer-events: none;
+  }
+  .typing-detected {
+    border-color: var(--warning) !important;
+  }
+</style>
 </head>
 <body>
 
@@ -75,6 +87,35 @@
     <div class="cmd-item"><div class="cmd-phrase">"stop listening" / "start listening"</div><div class="cmd-desc">toggle recording</div></div>
     <div class="cmd-item"><div class="cmd-phrase">"toggle AI panel"</div><div class="cmd-desc">show/hide AI sidebar</div></div>
     <div class="cmd-item"><div class="cmd-phrase">"new session"</div><div class="cmd-desc">save current & start fresh</div></div>
+  </div>
+
+  <div class="cmd-group">
+    <div class="cmd-group-title">Macros</div>
+    <div class="cmd-item"><div class="cmd-phrase">"start macro [name]"</div><div class="cmd-desc">begin recording a macro</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"stop macro"</div><div class="cmd-desc">stop recording and save</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"play macro [name]"</div><div class="cmd-desc">replay a saved macro</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"list macros"</div><div class="cmd-desc">show all saved macros</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"delete macro [name]"</div><div class="cmd-desc">remove a saved macro</div></div>
+  </div>
+
+  <div class="cmd-group">
+    <div class="cmd-group-title">Advanced AI</div>
+    <div class="cmd-item"><div class="cmd-phrase">"show confidence" / "hide confidence"</div><div class="cmd-desc">toggle confidence heatmap</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"accept suggestion"</div><div class="cmd-desc">accept ghost text prediction</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"dismiss suggestion"</div><div class="cmd-desc">dismiss ghost text</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"diagram this"</div><div class="cmd-desc">auto-detect diagram type</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"flowchart this"</div><div class="cmd-desc">generate flowchart</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"sequence diagram this"</div><div class="cmd-desc">generate sequence diagram</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"format all"</div><div class="cmd-desc">format for all targets</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"format for [target]"</div><div class="cmd-desc">format for specific target</div></div>
+  </div>
+
+  <div class="cmd-group">
+    <div class="cmd-group-title">Tools</div>
+    <div class="cmd-item"><div class="cmd-phrase">"show analytics" / "show stats"</div><div class="cmd-desc">open analytics dashboard</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"search sessions [query]"</div><div class="cmd-desc">search across sessions</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"show timeline" / "hide timeline"</div><div class="cmd-desc">toggle session timeline</div></div>
+    <div class="cmd-item"><div class="cmd-phrase">"build command"</div><div class="cmd-desc">open custom command builder</div></div>
   </div>
 </div>
 
@@ -176,6 +217,9 @@
     </div>
   </div>
 
+  <!-- TIMELINE PANEL -->
+  <div id="timelineContainer"></div>
+
   <!-- AI SIDEBAR -->
   <div class="ai-sidebar" id="aiSidebar">
     <!-- Corrections (collapsible) -->
@@ -215,10 +259,13 @@
       <button class="btn-secondary" onclick="toggleCmdPanel()">COMMANDS</button>
       <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
       <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
+      <button class="btn-secondary" onclick="toggleTimeline()">TIMELINE</button>
+      <button class="btn-secondary" onclick="showAnalytics()">ANALYTICS</button>
 
       <div class="footer-templates">
         <span class="footer-template-label">TEMPLATE</span>
         <div class="template-selector" id="templateSelector"></div>
+        <button class="btn-secondary" onclick="openPromptBuilder()" title="Build custom template" style="padding:4px 8px;font-size:0.55rem">+</button>
       </div>
 
       <label class="footer-toggle" title="Auto-correct">

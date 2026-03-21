@@ -18,6 +18,26 @@ import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
   renameSession, exportSessions, importSessions } from './utils/persistence.js';
 import { fetchProjects, sortByModified, sortByName, saveProjectSettings, loadProjectSettings } from './utils/projects.js';
 
+// ── New modules ──
+import { PromptBuilder } from './ui/prompt-builder.js';
+import { AmbientDetector } from './stt/ambient-detector.js';
+import { CorrectionLearner } from './stt/correction-learner.js';
+import { AnalyticsDashboard } from './ui/analytics-dashboard.js';
+import { ConfidenceHeatmap } from './ui/confidence-heatmap.js';
+import { SessionSearch } from './utils/session-search.js';
+import { SearchResultsModal } from './ui/search-results.js';
+import { MacroRecorder } from './stt/macro-recorder.js';
+import { CommandComposer } from './stt/command-composer.js';
+import { CommandBuilderModal } from './ui/command-builder.js';
+import { SessionTimeline } from './utils/timeline.js';
+import { TimelineViewer } from './ui/timeline-viewer.js';
+import { GhostPredictor } from './ai/ghost-predictor.js';
+import { MultiFormatter } from './ai/multi-formatter.js';
+import { FormatCardsModal } from './ui/format-cards.js';
+import { DiagramGenerator } from './ai/diagram-generator.js';
+import { DiagramRenderer } from './ui/diagram-renderer.js';
+import { ContextInjector } from './ai/context-injector.js';
+
 // ══════════════════════════════════════════
 // State
 // ══════════════════════════════════════════
@@ -219,6 +239,17 @@ function onProjectSelected(name) {
   s.stackContext = stackInput?.value || '';
   saveSettings(s);
 
+  // Scan project for context injection
+  contextInjector.scanProject(name).then(ctx => {
+    if (ctx) {
+      const contextBlock = contextInjector.getContextBlock();
+      if (contextBlock) {
+        correctionPipeline.projectContext = contextBlock;
+        promptStructurer.projectContext = name;
+      }
+    }
+  });
+
   flashCmd('PROJECT: ' + name.toUpperCase());
 }
 
@@ -236,6 +267,26 @@ const commandParser = new CommandParser();
 const aiClient = new AIClient();
 const apiSettingsModal = new APISettingsModal(aiClient);
 
+// ── New module instances ──
+const promptBuilder = new PromptBuilder(aiClient);
+const ambientDetector = new AmbientDetector();
+const correctionLearner = new CorrectionLearner();
+const analyticsDashboard = new AnalyticsDashboard();
+const confidenceHeatmap = new ConfidenceHeatmap();
+const sessionSearch = new SessionSearch(aiClient);
+const searchResultsModal = new SearchResultsModal(sessionSearch);
+const macroRecorder = new MacroRecorder();
+const commandComposer = new CommandComposer();
+const commandBuilderModal = new CommandBuilderModal(commandComposer);
+const sessionTimeline = new SessionTimeline();
+const timelineViewer = new TimelineViewer(sessionTimeline);
+const ghostPredictor = new GhostPredictor(aiClient);
+const multiFormatter = new MultiFormatter(aiClient);
+const formatCardsModal = new FormatCardsModal(multiFormatter);
+const diagramGenerator = new DiagramGenerator(aiClient);
+const diagramRenderer = new DiagramRenderer();
+const contextInjector = new ContextInjector();
+
 const sttEngine = new WebSpeechEngine({
   lang: 'en-US',
   maxAlternatives: 1,
@@ -248,12 +299,51 @@ const sttEngine = new WebSpeechEngine({
     updateConfidence(confidence);
     state.interimTranscript = '';
 
-    // Try command first
-    if (commandParser.process(text)) {
+    // Confidence heatmap tracking
+    confidenceHeatmap.addSegment(text, confidence, alts || []);
+
+    // Timeline recording
+    sessionTimeline.record('stt-final', { text, confidence });
+
+    // Check custom commands first (CommandComposer)
+    const composerMatch = commandComposer.tryMatch(text);
+    if (composerMatch) {
+      commandComposer.execute(composerMatch.trigger, {
+        rawTranscript: state.rawTranscript,
+        template: promptStructurer.currentTemplate,
+        project: $('projectContext')?.value || '',
+      }, async (step) => {
+        if (step.action === 'command') commandParser.process(step.value);
+        else if (step.action === 'text') {
+          commandParser.pushUndo();
+          state.rawTranscript += step.value;
+          renderTranscript();
+        } else if (step.action === 'template') {
+          if (promptStructurer.setTemplate(step.value)) renderTemplateSelector();
+        } else if (step.action === 'copy') {
+          if (step.value === 'raw') copyRaw();
+          else if (step.value === 'refined') copyRefined();
+          else if (step.value === 'structured') copyStructured();
+        }
+      });
+      sessionTimeline.record('command', { action: 'custom', arg: composerMatch.trigger });
+      if (macroRecorder.isRecording) macroRecorder.recordStep('command', text);
       renderTranscript();
       updateStats();
       return;
     }
+
+    // Try built-in command
+    if (commandParser.process(text)) {
+      sessionTimeline.record('command', { action: text });
+      if (macroRecorder.isRecording) macroRecorder.recordStep('command', text);
+      renderTranscript();
+      updateStats();
+      return;
+    }
+
+    // Macro recording — record text step
+    if (macroRecorder.isRecording) macroRecorder.recordStep('text', text);
 
     // Auto-punctuation
     const punctuated = autoPunct.join(state.rawTranscript, text);
@@ -262,6 +352,9 @@ const sttEngine = new WebSpeechEngine({
 
     // Feed to AI correction pipeline
     correctionPipeline.onNewText(autoPunct.process(text));
+
+    // Ghost predictor — reset pause timer on new activity
+    ghostPredictor.onActivity(state.rawTranscript, promptStructurer.currentTemplate, $('projectContext')?.value || '');
 
     renderTranscript();
     updateStats();
@@ -292,6 +385,11 @@ const correctionPipeline = new CorrectionPipeline(aiClient, {
     renderRefined(fullText);
     renderCorrections(diffs);
     autoSave();
+    // Feed diffs to correction learner
+    if (diffs && diffs.length > 0) {
+      correctionLearner.observeDiffs(diffs);
+      sessionTimeline.record('correction', { count: diffs.length, original: diffs[0]?.original, corrected: diffs[0]?.corrected });
+    }
   },
   onError: (err) => {
     console.warn('Correction error:', err);
@@ -317,6 +415,7 @@ const promptStructurer = new PromptStructurer(aiClient, {
     setAIStatus('connected');
     renderStructuredInPane(text);
     autoSave();
+    sessionTimeline.record('structure', { template: promptStructurer.currentTemplate });
   },
   onError: (err) => {
     console.warn('Structure error:', err);
@@ -447,6 +546,9 @@ async function startAudio() {
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 512;
     source.connect(analyser);
+    // Wire ambient detector to the analyser
+    ambientDetector.setAnalyser(analyser);
+    ambientDetector.start();
   } catch (e) { console.warn('Audio:', e); }
 }
 
@@ -502,6 +604,10 @@ function clearAll() {
   state.currentSessionId = null;
   commandParser.reset();
   correctionPipeline.reset();
+  confidenceHeatmap.clear();
+  sessionTimeline.clear();
+  sessionTimeline.record('clear');
+  ghostPredictor.dismiss();
   $('cmdCount').textContent = '0';
   $('sessionTime').textContent = '0:00';
   updateStats();
@@ -554,15 +660,26 @@ function renderTranscript() {
   }
   if (ph) ph.remove();
 
-  const paragraphs = state.rawTranscript.split('\n\n');
-  let html = paragraphs.map(p =>
-    `<span class="final-text">${p.split('\n').map(escapeHtml).join('<br>')}</span>`
-  ).join('<br><br>');
-
-  if (state.interimTranscript) {
-    html += ` <span class="interim-text">${escapeHtml(state.interimTranscript)}</span>`;
+  // Use confidence heatmap rendering when enabled
+  const heatmapHtml = confidenceHeatmap.renderHtml();
+  let html;
+  if (heatmapHtml) {
+    html = heatmapHtml;
+    if (state.interimTranscript) {
+      html += ` <span class="interim-text">${escapeHtml(state.interimTranscript)}</span>`;
+    }
+  } else {
+    const paragraphs = state.rawTranscript.split('\n\n');
+    html = paragraphs.map(p =>
+      `<span class="final-text">${p.split('\n').map(escapeHtml).join('<br>')}</span>`
+    ).join('<br><br>');
+    if (state.interimTranscript) {
+      html += ` <span class="interim-text">${escapeHtml(state.interimTranscript)}</span>`;
+    }
   }
   el.innerHTML = html;
+  // Attach heatmap click handlers when active
+  if (heatmapHtml) confidenceHeatmap.attachClickHandlers(el);
   const scroll = $('rawScroll');
   scroll.scrollTop = scroll.scrollHeight;
 }
@@ -1358,6 +1475,170 @@ function showServerSetup() {
 window.showServerSetup = showServerSetup;
 
 // ══════════════════════════════════════════
+// New Module Callbacks & Functions
+// ══════════════════════════════════════════
+
+// ── Prompt Builder ──
+promptBuilder.onSave = (key, template) => {
+  renderTemplateSelector();
+  flashCmd('TEMPLATE SAVED: ' + (template.label || key).toUpperCase());
+};
+
+function openPromptBuilder(templateKey = null) {
+  promptBuilder.open(templateKey);
+}
+
+// ── Ambient Detector ──
+ambientDetector.onStateChange = (newState, oldState) => {
+  const pill = $('statusPill');
+  if (newState === 'typing' && state.isRecording) {
+    pill?.classList.add('typing-detected');
+  } else {
+    pill?.classList.remove('typing-detected');
+  }
+};
+
+// ── Correction Learner ──
+correctionLearner.onPromotion = (misheard, correct) => {
+  flashCmd(`LEARNED: "${misheard}" \u2192 "${correct}"`);
+};
+
+// ── Analytics Dashboard ──
+function showAnalytics() {
+  const sessionsIndex = loadSessionsIndex();
+  const learnerStats = correctionLearner.getStats();
+  analyticsDashboard.open(sessionsIndex, learnerStats);
+}
+
+// ── Confidence Heatmap ──
+confidenceHeatmap.onWordOverride = (segIdx, newWord) => {
+  renderTranscript();
+};
+
+// ── Session Search ──
+searchResultsModal.onSessionSelect = (sessionId) => {
+  onSessionSelected(sessionId);
+};
+
+function showSearchResults(query = '') {
+  searchResultsModal.open(query);
+}
+
+// ── Macro Recorder ──
+macroRecorder.onRecordStart = (name) => flashCmd('RECORDING MACRO: ' + name.toUpperCase());
+macroRecorder.onRecordStop = (name, macro) => flashCmd(`MACRO SAVED: ${name.toUpperCase()} (${macro.steps.length} steps)`);
+macroRecorder.onPlayStart = (name) => flashCmd('PLAYING MACRO: ' + name.toUpperCase());
+macroRecorder.onPlayDone = (name) => flashCmd('MACRO DONE: ' + name.toUpperCase());
+
+async function executeMacroStep(step) {
+  if (step.type === 'command') {
+    commandParser.process(step.value);
+  } else if (step.type === 'text') {
+    commandParser.pushUndo();
+    state.rawTranscript = autoPunct.join(state.rawTranscript, step.value);
+    correctionPipeline.onNewText(autoPunct.process(step.value));
+    renderTranscript();
+    updateStats();
+  }
+}
+
+// ── Command Builder ──
+commandBuilderModal.onSave = (trigger, command) => {
+  flashCmd('COMMAND SAVED: ' + trigger.toUpperCase());
+};
+
+function openCommandBuilder(trigger = null) {
+  commandBuilderModal.open(trigger);
+}
+
+// ── Timeline ──
+sessionTimeline.record('session-start');
+
+function toggleTimeline() {
+  timelineViewer.toggle();
+  timelineViewer.update();
+}
+
+timelineViewer.onScrub = (timestamp) => {
+  const text = sessionTimeline.getTextAtTime(timestamp);
+  $('rawContent').innerHTML = `<span class="final-text">${escapeHtml(text)}</span>`;
+};
+
+// ── Ghost Predictor ──
+ghostPredictor.onPrediction = (prediction) => {
+  const el = $('rawContent');
+  if (!el) return;
+  // Show ghost text as faded continuation
+  let ghostEl = document.getElementById('ghostText');
+  if (!ghostEl) {
+    ghostEl = document.createElement('span');
+    ghostEl.id = 'ghostText';
+    ghostEl.className = 'ghost-text';
+    el.appendChild(ghostEl);
+  }
+  ghostEl.textContent = ' ' + prediction;
+};
+
+ghostPredictor.onClear = () => {
+  const ghostEl = document.getElementById('ghostText');
+  if (ghostEl) ghostEl.remove();
+};
+
+function acceptGhostText() {
+  const text = ghostPredictor.accept();
+  if (text) {
+    commandParser.pushUndo();
+    state.rawTranscript += ' ' + text;
+    correctionPipeline.onNewText(text);
+    renderTranscript();
+    updateStats();
+    sessionTimeline.record('ghost-accept', { text });
+    flashCmd('SUGGESTION ACCEPTED');
+  }
+}
+
+function dismissGhostText() {
+  ghostPredictor.dismiss();
+  sessionTimeline.record('ghost-dismiss');
+  flashCmd('SUGGESTION DISMISSED');
+}
+
+// ── Multi Formatter / Format Cards ──
+function openFormatCards() {
+  const text = correctionPipeline.correctedText || state.rawTranscript;
+  if (!text.trim()) { flashCmd('NOTHING TO FORMAT'); return; }
+  const model = $('modelSelect')?.value || aiClient.getSelectedModel();
+  const context = {
+    project: $('projectContext')?.value || '',
+    stack: $('stackContext')?.value || '',
+  };
+  formatCardsModal.open(text, model, context);
+}
+
+// ── Diagram Generator ──
+async function generateDiagram(type = 'auto') {
+  const text = correctionPipeline.correctedText || state.rawTranscript;
+  if (!text.trim()) { flashCmd('NOTHING TO DIAGRAM'); return; }
+  const model = $('modelSelect')?.value || aiClient.getSelectedModel();
+  flashCmd('GENERATING DIAGRAM');
+  const diagram = await diagramGenerator.generate(text, model, type);
+  if (diagram) {
+    // Render in the refined pane
+    state.structureView = true;
+    $('refinedLabel').textContent = diagram.label.toUpperCase();
+    $('refinedLabel').classList.add('structured');
+    $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
+    await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
+    flashCmd('DIAGRAM GENERATED');
+  } else {
+    flashCmd('DIAGRAM FAILED');
+  }
+}
+
+// ── Context Injector ──
+// Wired in onProjectSelected below
+
+// ══════════════════════════════════════════
 // Init
 // ══════════════════════════════════════════
 function _saveCurrentProjectSettings() {
@@ -1513,6 +1794,67 @@ function init() {
 
   // Detect if running without local server (e.g. GitHub Pages)
   detectServerMode();
+
+  // ── New module init ──
+  // Timeline viewer — render into timeline container
+  timelineViewer.render('timelineContainer');
+
+  // Wire new command parser callbacks for new modules
+  commandParser.onMacroStart = (name) => {
+    if (macroRecorder.startRecording(name)) flashCmd('RECORDING MACRO: ' + name.toUpperCase());
+    else flashCmd('MACRO RECORDING FAILED');
+  };
+  commandParser.onMacroStop = () => {
+    const macro = macroRecorder.stopRecording();
+    if (macro) flashCmd('MACRO SAVED');
+    else flashCmd('NO RECORDING');
+  };
+  commandParser.onMacroPlay = (name) => {
+    macroRecorder.playMacro(name, executeMacroStep);
+  };
+  commandParser.onMacroList = () => {
+    const list = macroRecorder.listMacros();
+    if (list.length === 0) { flashCmd('NO MACROS'); return; }
+    flashCmd('MACROS: ' + list.map(m => m.name).join(', '));
+  };
+  commandParser.onMacroDelete = (name) => {
+    if (macroRecorder.deleteMacro(name)) flashCmd('MACRO DELETED: ' + name.toUpperCase());
+    else flashCmd('MACRO NOT FOUND');
+  };
+  commandParser.onShowConfidence = () => {
+    confidenceHeatmap.enabled = true;
+    renderTranscript();
+    flashCmd('CONFIDENCE ON');
+  };
+  commandParser.onHideConfidence = () => {
+    confidenceHeatmap.enabled = false;
+    renderTranscript();
+    flashCmd('CONFIDENCE OFF');
+  };
+  commandParser.onAcceptSuggestion = () => acceptGhostText();
+  commandParser.onDismissSuggestion = () => dismissGhostText();
+  commandParser.onDiagram = (type) => generateDiagram(type);
+  commandParser.onFormatAll = () => openFormatCards();
+  commandParser.onFormatFor = (target) => {
+    const text = correctionPipeline.correctedText || state.rawTranscript;
+    if (!text.trim()) { flashCmd('NOTHING TO FORMAT'); return; }
+    const model = $('modelSelect')?.value || aiClient.getSelectedModel();
+    const context = { project: $('projectContext')?.value || '', stack: $('stackContext')?.value || '' };
+    multiFormatter.formatSingle(text, model, target, context).then(result => {
+      if (result && result.output) {
+        state.structureView = true;
+        $('refinedLabel').textContent = result.label.toUpperCase();
+        $('refinedLabel').classList.add('structured');
+        renderStructuredInPane(result.output);
+        flashCmd('FORMATTED: ' + result.label.toUpperCase());
+      }
+    });
+  };
+  commandParser.onShowAnalytics = () => showAnalytics();
+  commandParser.onSearchSessions = (query) => showSearchResults(query);
+  commandParser.onShowTimeline = () => { timelineViewer.open(); flashCmd('TIMELINE OPEN'); };
+  commandParser.onHideTimeline = () => { timelineViewer.close(); flashCmd('TIMELINE CLOSED'); };
+  commandParser.onBuildCommand = () => openCommandBuilder();
 }
 
 // ══════════════════════════════════════════
@@ -1536,6 +1878,15 @@ window.onRenameSession = onRenameSession;
 window.onExportSessions = onExportSessions;
 window.onImportSessions = onImportSessions;
 window.openAISettings = () => apiSettingsModal.open();
+window.openPromptBuilder = openPromptBuilder;
+window.showAnalytics = showAnalytics;
+window.showSearchResults = showSearchResults;
+window.openCommandBuilder = openCommandBuilder;
+window.toggleTimeline = toggleTimeline;
+window.openFormatCards = openFormatCards;
+window.generateDiagram = generateDiagram;
+window.acceptGhostText = acceptGhostText;
+window.dismissGhostText = dismissGhostText;
 
 // Boot
 init();

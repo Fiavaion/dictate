@@ -36,6 +36,25 @@ export class CommandParser {
     this.onShowAlternatives = null;
     this.onToggleAIPanel = null;
     this.onNewSession = null;
+
+    // New module callbacks
+    this.onMacroStart = null;        // (name) => void
+    this.onMacroStop = null;         // () => void
+    this.onMacroPlay = null;         // (name) => void
+    this.onMacroList = null;         // () => void
+    this.onMacroDelete = null;       // (name) => void
+    this.onShowConfidence = null;    // () => void
+    this.onHideConfidence = null;    // () => void
+    this.onAcceptSuggestion = null;  // () => void
+    this.onDismissSuggestion = null; // () => void
+    this.onDiagram = null;           // (type) => void
+    this.onFormatAll = null;         // () => void
+    this.onFormatFor = null;         // (target) => void
+    this.onShowAnalytics = null;     // () => void
+    this.onSearchSessions = null;    // (query) => void
+    this.onShowTimeline = null;      // () => void
+    this.onHideTimeline = null;      // () => void
+    this.onBuildCommand = null;      // () => void
   }
 
   pushUndo() {
@@ -224,6 +243,86 @@ export class CommandParser {
     if (t === 'copy raw')        { this.onCopyRaw?.();        this._flash('RAW COPIED');        return true; }
     if (t === 'copy to claude' || t === 'send to claude' || t === 'copy refined to claude') {
       this.onCopyToClaude?.(); this._flash('READY — PASTE IN VS CODE'); return true;
+    }
+
+    // ── Macro Commands ──
+    const macroStart = t.match(/^start macro (.+)$/);
+    if (macroStart) {
+      this.onMacroStart?.(macroStart[1]); return true;
+    }
+    if (t === 'stop macro') {
+      this.onMacroStop?.(); this._flash('MACRO STOPPED'); return true;
+    }
+    const macroPlay = t.match(/^play macro (.+)$/);
+    if (macroPlay) {
+      this.onMacroPlay?.(macroPlay[1]); return true;
+    }
+    if (t === 'list macros') {
+      this.onMacroList?.(); return true;
+    }
+    const macroDelete = t.match(/^delete macro (.+)$/);
+    if (macroDelete) {
+      this.onMacroDelete?.(macroDelete[1]); return true;
+    }
+
+    // ── Confidence Heatmap ──
+    if (t === 'show confidence') {
+      this.onShowConfidence?.(); return true;
+    }
+    if (t === 'hide confidence') {
+      this.onHideConfidence?.(); return true;
+    }
+
+    // ── Ghost Text (Suggestions) ──
+    if (t === 'accept suggestion') {
+      this.onAcceptSuggestion?.(); return true;
+    }
+    if (t === 'dismiss suggestion') {
+      this.onDismissSuggestion?.(); return true;
+    }
+
+    // ── Diagram Generation ──
+    if (t === 'diagram this') {
+      this.onDiagram?.('auto'); this._flash('GENERATING DIAGRAM'); return true;
+    }
+    if (t === 'flowchart this') {
+      this.onDiagram?.('flowchart'); this._flash('GENERATING FLOWCHART'); return true;
+    }
+    if (t === 'sequence diagram this') {
+      this.onDiagram?.('sequence'); this._flash('GENERATING SEQUENCE DIAGRAM'); return true;
+    }
+
+    // ── Multi-Format Output ──
+    if (t === 'format all') {
+      this.onFormatAll?.(); this._flash('FORMATTING ALL'); return true;
+    }
+    const formatFor = t.match(/^format for (.+)$/);
+    if (formatFor) {
+      this.onFormatFor?.(formatFor[1]); return true;
+    }
+
+    // ── Analytics ──
+    if (t === 'show analytics' || t === 'show stats') {
+      this.onShowAnalytics?.(); this._flash('ANALYTICS'); return true;
+    }
+
+    // ── Session Search ──
+    const searchSessions = t.match(/^search sessions (.+)$/);
+    if (searchSessions) {
+      this.onSearchSessions?.(searchSessions[1]); this._flash('SEARCHING'); return true;
+    }
+
+    // ── Timeline ──
+    if (t === 'show timeline') {
+      this.onShowTimeline?.(); return true;
+    }
+    if (t === 'hide timeline') {
+      this.onHideTimeline?.(); return true;
+    }
+
+    // ── Command Builder ──
+    if (t === 'build command') {
+      this.onBuildCommand?.(); this._flash('COMMAND BUILDER'); return true;
     }
 
     return false;
