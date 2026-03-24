@@ -35,10 +35,12 @@ const PROVIDERS = {
   },
   google: {
     label: 'Google',
-    defaultModel: 'gemini-2.0-flash',
+    defaultModel: 'gemini-2.5-flash',
     models: [
-      { name: 'gemini-2.0-flash', label: 'Gemini Flash' },
-      { name: 'gemini-2.5-pro', label: 'Gemini Pro' },
+      { name: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { name: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+      { name: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { name: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)' },
     ],
     local: false,
   },

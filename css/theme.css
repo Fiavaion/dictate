@@ -252,6 +252,52 @@ select.voice-select { min-width: 160px; max-width: 220px; }
 .btn-sort:hover { border-color: var(--accent2); color: var(--accent2); }
 .btn-sort svg { display: block; }
 
+/* ── Gemini Wizard CTA ── */
+.btn-gemini-wizard {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--ai-glow) 8%, var(--panel));
+  border: 1px solid var(--ai-glow);
+  color: var(--ai-glow);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.3s;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ai-glow) 15%, transparent);
+  animation: wizardPulse 3s ease-in-out infinite;
+}
+.btn-gemini-wizard:hover {
+  background: color-mix(in srgb, var(--ai-glow) 15%, var(--panel));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--ai-glow) 25%, transparent);
+}
+.btn-gemini-wizard svg { display: block; }
+.wizard-btn-label { white-space: nowrap; }
+@keyframes wizardPulse {
+  0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, var(--ai-glow) 15%, transparent); }
+  50% { box-shadow: 0 0 20px color-mix(in srgb, var(--ai-glow) 25%, transparent); }
+}
+.btn-gemini-wizard.configured {
+  opacity: 0.4;
+  border-color: var(--border);
+  color: var(--dim);
+  background: var(--panel);
+  box-shadow: none;
+  animation: none;
+}
+.btn-gemini-wizard.configured:hover {
+  opacity: 0.7;
+  border-color: var(--muted);
+  color: var(--muted);
+  box-shadow: none;
+}
+
 /* ── Session Selector ── */
 .session-selector {
   display: flex;

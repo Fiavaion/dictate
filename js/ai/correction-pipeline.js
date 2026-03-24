@@ -96,6 +96,11 @@ export class CorrectionPipeline {
       return;
     }
 
+    // Cloud providers: accumulate text, don't auto-fire (use Structure to send)
+    if (this.client.providerConfig && !this.client.providerConfig.local) {
+      return;
+    }
+
     clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => this._correctPending(), this.debounceMs);
   }

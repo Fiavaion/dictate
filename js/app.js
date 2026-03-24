@@ -37,6 +37,7 @@ import { FormatCardsModal } from './ui/format-cards.js';
 import { DiagramGenerator } from './ai/diagram-generator.js';
 import { DiagramRenderer } from './ui/diagram-renderer.js';
 import { ContextInjector } from './ai/context-injector.js';
+import { GeminiWizard } from './ui/gemini-wizard.js';
 
 // ══════════════════════════════════════════
 // State
@@ -270,6 +271,7 @@ const autoPunct = new AutoPunctuation('auto');
 const commandParser = new CommandParser();
 const aiClient = new AIClient();
 const apiSettingsModal = new APISettingsModal(aiClient);
+const geminiWizard = new GeminiWizard(aiClient);
 
 // ── New module instances ──
 const promptBuilder = new PromptBuilder(aiClient);
@@ -1771,11 +1773,32 @@ function init() {
     correctionPipeline.setModel(model);
     promptStructurer.setModel(model);
     _refreshAIConnection();
+    _updateWizardButton();
   };
   const btnAISettings = $('btnAISettings');
   if (btnAISettings) {
     btnAISettings.onclick = () => apiSettingsModal.open();
   }
+
+  // Gemini Setup Wizard
+  geminiWizard.render();
+  geminiWizard.onComplete = (provider) => {
+    const switchEl = $('aiModeSwitch');
+    if (switchEl) {
+      switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === 'cloud');
+      });
+    }
+    const model = aiClient.getSelectedModel(provider);
+    correctionPipeline.setModel(model);
+    promptStructurer.setModel(model);
+    _refreshAIConnection();
+    _updateWizardButton();
+    flashCmd('GEMINI CLOUD AI ACTIVATED');
+  };
+  _updateWizardButton();
+  const btnWizard = $('btnGeminiWizard');
+  if (btnWizard) btnWizard.onclick = () => geminiWizard.open();
 
   // Auto-correct toggle
   const aiToggle = $('aiToggle');
@@ -1987,6 +2010,14 @@ function setAIMode(mode) {
   _refreshAIConnection();
 }
 
+function _updateWizardButton() {
+  const btn = $('btnGeminiWizard');
+  if (!btn) return;
+  const hasKey = !!aiClient.getApiKey('google');
+  btn.classList.toggle('configured', hasKey);
+  btn.title = hasKey ? 'Gemini is configured (click to reconfigure)' : 'Set up free Cloud AI (Gemini)';
+}
+
 async function _refreshAIConnection() {
   renderModelSelector();
   aiClient.stopMonitoring();
@@ -2119,6 +2150,7 @@ window.onRenameSession = onRenameSession;
 window.onExportSessions = onExportSessions;
 window.onImportSessions = onImportSessions;
 window.openAISettings = () => apiSettingsModal.open();
+window.openGeminiWizard = () => geminiWizard.open();
 window.openPromptBuilder = openPromptBuilder;
 window.showAnalytics = showAnalytics;
 window.showSearchResults = showSearchResults;
