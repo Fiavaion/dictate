@@ -115,14 +115,13 @@ def browse_directory(path_str):
 
 
 def get_drive_roots():
-    """Return available drive letters on Windows."""
-    import string
-    roots = []
-    for letter in string.ascii_uppercase:
-        drive = pathlib.Path(f"{letter}:\\")
-        if drive.exists():
-            roots.append(str(drive))
-    return roots
+    """Return drive roots: Windows drive letters, or / on Unix/Mac."""
+    import sys
+    if sys.platform == 'win32':
+        import string
+        return [str(pathlib.Path(f"{l}:\\")) for l in string.ascii_uppercase
+                if pathlib.Path(f"{l}:\\").exists()]
+    return ['/']
 
 
 def get_projects():

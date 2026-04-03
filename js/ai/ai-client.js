@@ -54,13 +54,59 @@ const STORAGE_MODEL_PREFIX = 'fiavaion-ai-model-';
 // which server the browser is talking to.
 const PROXY_URL = `${window.location.origin}/api/ai/proxy`;
 
-function b64Encode(str) {
-  try { return btoa(unescape(encodeURIComponent(str))); } catch { return ''; }
+// ---------------------------------------------------------------------------
+// Encryption helpers (AES-GCM via Web Crypto API)
+// ---------------------------------------------------------------------------
+const CRYPTO_SALT = 'fiavaion-dictate-key-salt-v1';
+
+async function _getDerivedKey() {
+  if (_getDerivedKey._cached) return _getDerivedKey._cached;
+  const enc = new TextEncoder();
+  const material = await crypto.subtle.importKey(
+    'raw', enc.encode(CRYPTO_SALT + location.origin), 'PBKDF2', false, ['deriveKey']
+  );
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode(CRYPTO_SALT), iterations: 100_000, hash: 'SHA-256' },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  _getDerivedKey._cached = key;
+  return key;
 }
 
-function b64Decode(str) {
-  try { return decodeURIComponent(escape(atob(str))); } catch { return ''; }
+async function encryptKey(plaintext) {
+  if (!plaintext) return '';
+  try {
+    const key = await _getDerivedKey();
+    const enc = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
+    // Store as base64: iv (12 bytes) + ciphertext
+    const buf = new Uint8Array(iv.length + ct.byteLength);
+    buf.set(iv);
+    buf.set(new Uint8Array(ct), iv.length);
+    return 'enc1:' + btoa(String.fromCharCode(...buf));
+  } catch { return ''; }
 }
+
+async function decryptKey(stored) {
+  if (!stored) return '';
+  // Legacy base64-only values (migration path)
+  if (!stored.startsWith('enc1:')) {
+    try { return decodeURIComponent(escape(atob(stored))); } catch { return ''; }
+  }
+  try {
+    const key = await _getDerivedKey();
+    const raw = Uint8Array.from(atob(stored.slice(5)), c => c.charCodeAt(0));
+    const iv = raw.slice(0, 12);
+    const ct = raw.slice(12);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(plain);
+  } catch { return ''; }
+}
+
 
 export class AIClient {
   constructor() {
@@ -69,9 +115,30 @@ export class AIClient {
     this._connected = false;
     this._checkInterval = null;
     this._providerModels = {};
+    this._keyCache = {};  // decrypted keys held in memory only
 
     for (const [key, cfg] of Object.entries(PROVIDERS)) {
       this._providerModels[key] = [...cfg.models];
+    }
+
+    // Decrypt stored keys into memory cache (+ migrate legacy base64 values)
+    this._initKeys();
+  }
+
+  async _initKeys() {
+    const providers = Object.keys(PROVIDERS).filter(k => !PROVIDERS[k].local);
+    for (const p of providers) {
+      const stored = localStorage.getItem(STORAGE_KEY_PREFIX + p);
+      if (!stored) continue;
+      const plain = await decryptKey(stored);
+      if (plain) {
+        this._keyCache[p] = plain;
+        // Re-encrypt legacy base64 values with AES-GCM
+        if (!stored.startsWith('enc1:')) {
+          const encrypted = await encryptKey(plain);
+          if (encrypted) localStorage.setItem(STORAGE_KEY_PREFIX + p, encrypted);
+        }
+      }
     }
   }
 
@@ -150,23 +217,21 @@ export class AIClient {
   // -------------------------------------------------------------------------
 
   setApiKey(provider, key, remember = true) {
+    this._keyCache[provider] = key;
     if (remember) {
-      localStorage.setItem(STORAGE_KEY_PREFIX + provider, b64Encode(key));
-    } else {
-      this._sessionKeys = this._sessionKeys || {};
-      this._sessionKeys[provider] = key;
+      encryptKey(key).then(enc => {
+        if (enc) localStorage.setItem(STORAGE_KEY_PREFIX + provider, enc);
+      });
     }
   }
 
   getApiKey(provider) {
-    const stored = localStorage.getItem(STORAGE_KEY_PREFIX + provider);
-    if (stored) return b64Decode(stored);
-    return this._sessionKeys?.[provider] || '';
+    return this._keyCache[provider] || '';
   }
 
   clearApiKey(provider) {
+    delete this._keyCache[provider];
     localStorage.removeItem(STORAGE_KEY_PREFIX + provider);
-    if (this._sessionKeys) delete this._sessionKeys[provider];
   }
 
   // -------------------------------------------------------------------------
