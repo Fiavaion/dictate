@@ -1,20 +1,32 @@
 #!/bin/bash
-# FiavaionDictate launcher for macOS
-# Double-click this file to start the app
+# FiavaionDictate launcher for macOS — double-click to start
 
-# Change to the folder this script lives in
 cd "$(dirname "$0")"
 
-# Check for Python 3
+# ── Check Python 3 ─────────────────────────────────────────────────────────────
 if ! command -v python3 &>/dev/null; then
-    osascript -e 'display dialog "Python 3 is not installed.\n\nPlease install it from python.org or via Homebrew:\n  brew install python\n\nThen double-click start.command again." with title "FiavaionDictate" buttons {"OK"} default button "OK" with icon stop'
+    osascript -e 'display dialog "Python 3 is required but was not found.\n\nInstall it from python.org, or via Homebrew:\n  brew install python\n\nThen double-click start.command again." with title "FiavaionDictate" buttons {"Open python.org", "Cancel"} default button "Open python.org" with icon stop'
+    if [ $? -eq 0 ]; then
+        open "https://www.python.org/downloads/"
+    fi
     exit 1
 fi
 
 echo "Starting FiavaionDictate..."
 
-# Open browser after a short delay to let the server start
-(sleep 1.5 && open "http://localhost:8080") &
+# ── Start server in background ─────────────────────────────────────────────────
+python3 server.py &
+SERVER_PID=$!
 
-# Start the server (stays open in Terminal)
-python3 server.py
+# ── Poll until server responds (max 20 seconds) ────────────────────────────────
+for i in $(seq 1 20); do
+    sleep 1
+    python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/system/check', timeout=1)" 2>/dev/null && break
+done
+
+# ── Open browser ───────────────────────────────────────────────────────────────
+open "http://localhost:8080"
+echo "FiavaionDictate is running. Close this Terminal window to stop the server."
+
+# Keep server alive
+wait $SERVER_PID

@@ -341,19 +341,25 @@ export class OnboardingWizard {
         <div class="ow-check-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ai-glow)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Private — nothing leaves your machine</span></div>
         <div class="ow-check-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ai-glow)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Requires ~3 GB disk space for a model</span></div>
       </div>
-      <a class="ow-link-btn" href="https://ollama.ai" target="_blank" rel="noopener">
+      <a class="ow-link-btn" href="https://ollama.ai" target="_blank" rel="noopener" id="owOllamaLink">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         DOWNLOAD OLLAMA (FREE)
       </a>
+      <div class="ow-install-hint" id="owInstallHint" style="display:none">
+        After installing, click <strong>Check Again</strong> below to continue.
+      </div>
       <div class="ow-status" id="owStatus" style="margin-top:12px"></div>
     `;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
       <div style="display:flex;gap:8px">
-        <button class="btn-secondary" id="owCheckAgain">CHECK AGAIN</button>
+        <button class="btn-mic ow-btn-next" id="owCheckAgain"><span>CHECK AGAIN</span></button>
         <button class="btn-secondary" id="owSkipLocal" style="opacity:0.6">SKIP →</button>
       </div>
     `;
+    this._el.querySelector('#owOllamaLink').onclick = () => {
+      this._el.querySelector('#owInstallHint').style.display = 'block';
+    };
     this._el.querySelector('#owBack').onclick = () => this._goTo(2);
     this._el.querySelector('#owSkipLocal').onclick = () => this._goTo(4);
     this._el.querySelector('#owCheckAgain').onclick = async () => {
@@ -774,6 +780,19 @@ export class OnboardingWizard {
         background: color-mix(in srgb, var(--accent) 20%, var(--surface));
         box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 20%, transparent);
       }
+      .ow-install-hint {
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: color-mix(in srgb, var(--success) 10%, var(--surface));
+        border: 1px solid var(--success);
+        border-radius: 6px;
+        font-family: var(--body);
+        font-size: 0.8rem;
+        color: var(--text);
+        text-align: center;
+        max-width: 340px;
+      }
+      .ow-install-hint strong { color: var(--success); }
       .ow-info-box {
         background: color-mix(in srgb, var(--accent) 8%, var(--surface));
         border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
