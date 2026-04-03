@@ -38,6 +38,7 @@ import { DiagramGenerator } from './ai/diagram-generator.js';
 import { DiagramRenderer } from './ui/diagram-renderer.js';
 import { ContextInjector } from './ai/context-injector.js';
 import { GeminiWizard } from './ui/gemini-wizard.js';
+import { OnboardingWizard } from './ui/onboarding-wizard.js';
 
 // ══════════════════════════════════════════
 // State
@@ -279,6 +280,7 @@ const commandParser = new CommandParser();
 const aiClient = new AIClient();
 const apiSettingsModal = new APISettingsModal(aiClient);
 const geminiWizard = new GeminiWizard(aiClient);
+const onboardingWizard = new OnboardingWizard(aiClient, geminiWizard);
 
 // ── New module instances ──
 const promptBuilder = new PromptBuilder(aiClient);
@@ -1807,6 +1809,45 @@ function init() {
   const btnWizard = $('btnGeminiWizard');
   if (btnWizard) btnWizard.onclick = () => geminiWizard.open();
 
+  // Onboarding Wizard — full first-run setup
+  onboardingWizard.render();
+  onboardingWizard.onComplete = ({ localModel, cloudProvider }) => {
+    // Apply local model selection
+    if (localModel) {
+      correctionPipeline.setModel(localModel);
+      promptStructurer.setModel(localModel);
+    }
+    // Apply cloud provider if configured
+    if (cloudProvider) {
+      const model = aiClient.getSelectedModel(cloudProvider);
+      correctionPipeline.setModel(model);
+      promptStructurer.setModel(model);
+      const switchEl = $('aiModeSwitch');
+      if (switchEl) {
+        switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.mode === 'cloud');
+        });
+      }
+    }
+    _refreshAIConnection();
+    _updateWizardButton();
+    _updateSetupButton();
+    const s = loadSettings();
+    s.firstLaunchCompleted = true;
+    saveSettings(s);
+    flashCmd('SETUP COMPLETE');
+  };
+
+  // Wire header setup button
+  const btnSetup = $('btnSetupWizard');
+  if (btnSetup) btnSetup.onclick = () => onboardingWizard.open();
+
+  // Show on first launch
+  const settings = loadSettings();
+  if (!settings.firstLaunchCompleted) {
+    onboardingWizard.open();
+  }
+
   // Auto-correct toggle
   const aiToggle = $('aiToggle');
   if (aiToggle) {
@@ -2023,6 +2064,15 @@ function _updateWizardButton() {
   const hasKey = !!aiClient.getApiKey('google');
   btn.classList.toggle('configured', hasKey);
   btn.title = hasKey ? 'Gemini is configured (click to reconfigure)' : 'Set up free Cloud AI (Gemini)';
+}
+
+function _updateSetupButton() {
+  const btn = $('btnSetupWizard');
+  if (!btn) return;
+  const anyKey = ['anthropic', 'openai', 'google'].some(p => !!aiClient.getApiKey(p));
+  const s = loadSettings();
+  btn.classList.toggle('configured', s.firstLaunchCompleted && anyKey);
+  btn.title = s.firstLaunchCompleted ? 'Re-run setup wizard' : 'Run setup wizard';
 }
 
 async function _refreshAIConnection() {

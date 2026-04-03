@@ -404,7 +404,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/api/projects":
+        if parsed.path == "/api/system/check":
+            import sys
+            self._json_ok({
+                "server": True,
+                "pythonVersion": sys.version.split()[0],
+            })
+        elif parsed.path == "/api/projects":
             self._json_ok(get_projects())
         elif parsed.path == "/api/projects-root":
             self._json_ok({"path": str(get_projects_root())})
