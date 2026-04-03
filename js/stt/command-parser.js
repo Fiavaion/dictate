@@ -138,7 +138,11 @@ export class CommandParser {
     if (rm) {
       this.pushUndo();
       const before = transcript;
-      const replaced = transcript.replace(new RegExp(rm[1], 'gi'), rm[2]);
+      // Escape search term so voice input is treated as literal text, not regex
+      const safe = rm[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let replaced;
+      try { replaced = transcript.replace(new RegExp(safe, 'gi'), rm[2]); }
+      catch { replaced = transcript; }
       this._updateTranscript(replaced);
       this._flash(before !== replaced ? `"${rm[1]}" \u2192 "${rm[2]}"` : 'NO MATCH');
       return true;

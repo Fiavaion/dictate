@@ -1,14 +1,33 @@
 #!/usr/bin/env python3
 """FiavaionDictate local server — static files + API endpoints"""
+import collections
 import http.server
 import json
 import os
 import pathlib
 import ssl
+import time
 import urllib.parse
 import urllib.request
 
-DEFAULT_PROJECTS_ROOT = r"C:\Users\jones\AIprojects"
+# ---------------------------------------------------------------------------
+# Rate limiting for /api/ai/proxy (30 requests per 60-second window per IP)
+# ---------------------------------------------------------------------------
+_RATE_WINDOW = 60
+_RATE_MAX = 30
+_rate_buckets: dict = {}
+
+def _check_rate_limit(ip: str) -> bool:
+    now = time.monotonic()
+    bucket = _rate_buckets.setdefault(ip, collections.deque())
+    while bucket and now - bucket[0] > _RATE_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= _RATE_MAX:
+        return False
+    bucket.append(now)
+    return True
+
+DEFAULT_PROJECTS_ROOT = str(pathlib.Path.home() / "AIprojects")
 CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
 PORT = 8080
 
@@ -34,7 +53,7 @@ def get_projects_root():
 
 
 def set_projects_root(path_str):
-    p = pathlib.Path(path_str)
+    p = pathlib.Path(path_str).resolve()
     if not p.is_dir():
         return False, "Directory does not exist"
     cfg = _load_config()
@@ -188,6 +207,21 @@ def scan_project(project_name):
 _SSL_CTX = ssl.create_default_context()
 
 
+def _safe_error_message(status_code, raw_body):
+    """Extract a safe user-facing message from an upstream API error body."""
+    try:
+        data = json.loads(raw_body)
+        # Anthropic: {"error": {"type": "...", "message": "..."}}
+        if isinstance(data.get("error"), dict):
+            return data["error"].get("message", f"HTTP {status_code}")[:200]
+        # OpenAI / generic: {"error": {"message": "..."}}
+        if "error" in data:
+            return str(data["error"])[:200]
+    except Exception:
+        pass
+    return f"HTTP {status_code}"
+
+
 def _upstream_request(url, body_bytes, headers):
     """Make an HTTPS request and return the http.client.HTTPResponse."""
     req = urllib.request.Request(url, data=body_bytes, headers=headers)
@@ -321,11 +355,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # Use HTTP/1.1 so the browser can reuse connections properly
     protocol_version = "HTTP/1.1"
 
+    _ALLOWED_ORIGINS = {
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "https://fiavaion.github.io",
+    }
+
     def _cors_headers(self):
-        """Add CORS headers to every response."""
-        self.send_header("Access-Control-Allow-Origin", "*")
+        """Add CORS headers — restrict to known origins only."""
+        origin = self.headers.get("Origin", "")
+        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:8080"
+        self.send_header("Access-Control-Allow-Origin", allowed)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Vary", "Origin")
+
+    def _security_headers(self):
+        """Add security headers to every response."""
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "SAMEORIGIN")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
 
     def _json_ok(self, data, code=200):
         """Send a JSON response with proper headers."""
@@ -334,6 +383,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self._cors_headers()
+        self._security_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -346,6 +396,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(204)
         self._cors_headers()
+        self._security_headers()
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -414,6 +465,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _handle_ai_proxy(self):
         """Proxy a cloud AI request to Anthropic, OpenAI, or Google."""
 
+        # --- Rate limit ---
+        if not _check_rate_limit(self.client_address[0]):
+            self._json_error(429, "Rate limit exceeded — wait 60 seconds")
+            return
+
         # --- Parse request ---
         try:
             data = self._read_body_json()
@@ -447,11 +503,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 # Google Gemini doesn't support streaming — always non-stream
                 resp = _call_google(api_key, model, prompt, system_prompt, options)
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode("utf-8", errors="replace")
-            self._json_error(e.code, error_body)
+            raw = e.read().decode("utf-8", errors="replace")
+            self._json_error(e.code, _safe_error_message(e.code, raw))
             return
-        except Exception as e:
-            self._json_error(502, str(e))
+        except Exception:
+            self._json_error(502, "Upstream request failed")
             return
 
         # --- Return response to browser ---

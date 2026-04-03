@@ -141,7 +141,14 @@ async function browseTo(path) {
     for (const name of data.dirs) {
       const item = document.createElement('div');
       item.className = 'folder-item';
-      item.innerHTML = `<span class="folder-item-icon">&#128193;</span> <span>${name}</span>`;
+      const icon = document.createElement('span');
+      icon.className = 'folder-item-icon';
+      icon.textContent = '\uD83D\uDCC1';
+      const label = document.createElement('span');
+      label.textContent = name;
+      item.appendChild(icon);
+      item.append(' ');
+      item.appendChild(label);
       const sep = browserCurrentPath.includes('/') ? '/' : '\\';
       const childPath = browserCurrentPath.replace(/[\\/]$/, '') + sep + name;
       item.ondblclick = () => browseTo(childPath);
@@ -397,9 +404,9 @@ const correctionPipeline = new CorrectionPipeline(aiClient, {
       sessionTimeline.record('correction', { count: diffs.length, original: diffs[0]?.original, corrected: diffs[0]?.corrected });
     }
   },
-  onError: (err) => {
-    console.warn('Correction error:', err);
+  onError: () => {
     setAIStatus('connected');
+    flashCmd('AI ERROR');
   },
 });
 
@@ -424,9 +431,9 @@ const promptStructurer = new PromptStructurer(aiClient, {
     sessionTimeline.record('structure', { template: promptStructurer.currentTemplate });
   },
   onError: (err) => {
-    console.warn('Structure error:', err);
     $('refinedContent').innerHTML = `<span class="placeholder">Error: ${escapeHtml(err)}</span>`;
     setAIStatus('connected');
+    flashCmd('AI ERROR');
   },
 });
 
@@ -555,7 +562,7 @@ async function startAudio() {
     // Wire ambient detector to the analyser
     ambientDetector.setAnalyser(analyser);
     ambientDetector.start();
-  } catch (e) { console.warn('Audio:', e); }
+  } catch { /* audio context unavailable — VU meter disabled */ }
 }
 
 // ══════════════════════════════════════════

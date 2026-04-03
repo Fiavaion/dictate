@@ -54,6 +54,10 @@ const STORAGE_MODEL_PREFIX = 'fiavaion-ai-model-';
 // which server the browser is talking to.
 const PROXY_URL = `${window.location.origin}/api/ai/proxy`;
 
+// Dev-only logger — silent in production
+const _dev = ['localhost', '127.0.0.1'].includes(location.hostname);
+const _devWarn = (...args) => { if (_dev) console.warn(...args); };
+
 // ---------------------------------------------------------------------------
 // Encryption helpers (AES-GCM via Web Crypto API)
 // ---------------------------------------------------------------------------
@@ -88,14 +92,15 @@ async function encryptKey(plaintext) {
     buf.set(iv);
     buf.set(new Uint8Array(ct), iv.length);
     return 'enc1:' + btoa(String.fromCharCode(...buf));
-  } catch { return ''; }
+  } catch (e) { _devWarn('encryptKey failed:', e); return ''; }
 }
 
 async function decryptKey(stored) {
   if (!stored) return '';
   // Legacy base64-only values (migration path)
   if (!stored.startsWith('enc1:')) {
-    try { return decodeURIComponent(escape(atob(stored))); } catch { return ''; }
+    try { return decodeURIComponent(escape(atob(stored))); }
+    catch (e) { _devWarn('decryptKey (legacy) failed:', e); return ''; }
   }
   try {
     const key = await _getDerivedKey();
@@ -104,7 +109,7 @@ async function decryptKey(stored) {
     const ct = raw.slice(12);
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
     return new TextDecoder().decode(plain);
-  } catch { return ''; }
+  } catch (e) { _devWarn('decryptKey failed:', e); return ''; }
 }
 
 
@@ -354,6 +359,8 @@ export class AIClient {
   // -------------------------------------------------------------------------
 
   async *_generateOllama(model, prompt, systemPrompt, options, signal) {
+    const timeout = AbortSignal.timeout(options.timeoutMs || 30000);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     const res = await fetch(`${this._ollamaClient.baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -364,7 +371,7 @@ export class AIClient {
         stream: true,
         options: { temperature: 0.1, top_p: 0.9, num_predict: 300, ...options },
       }),
-      signal,
+      signal: combined,
     });
 
     if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
@@ -430,11 +437,13 @@ export class AIClient {
     const apiKey = this.getApiKey(this._provider);
     if (!apiKey) throw new Error(`No API key for ${this._provider}`);
 
+    const timeout = AbortSignal.timeout(options.timeoutMs || 30000);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: this._buildProxyPayload(model, prompt, systemPrompt, true, options),
-      signal,
+      signal: combined,
     });
 
     if (!res.ok) {
