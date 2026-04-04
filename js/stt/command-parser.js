@@ -55,6 +55,7 @@ export class CommandParser {
     this.onShowTimeline = null;      // () => void
     this.onHideTimeline = null;      // () => void
     this.onBuildCommand = null;      // () => void
+    this.onAITransformSelection = null; // (instruction) => void — AI edit on selected text
   }
 
   pushUndo() {
@@ -233,6 +234,33 @@ export class CommandParser {
     }
     if (t === 'new session') {
       this.onNewSession?.(); this._flash('NEW SESSION'); return true;
+    }
+
+    // ── Selection Transform Commands ──
+    // These act on the currently selected text in the raw dictation pane.
+    // Say "simplify that" after selecting text with your mouse.
+    {
+      const TRANSFORMS = {
+        'simplify that':       'Simplify this text — make it clearer and easier to understand',
+        'fix that':            'Fix the grammar and spelling in this text',
+        'correct that':        'Fix the grammar and spelling in this text',
+        'expand that':         'Expand and elaborate on this text with more detail',
+        'elaborate on that':   'Expand and elaborate on this text with more detail',
+        'shorten that':        'Shorten this text while keeping the key meaning',
+        'condense that':       'Shorten this text while keeping the key meaning',
+        'formalize that':      'Rewrite this text in a formal, professional tone',
+        'make it formal':      'Rewrite this text in a formal, professional tone',
+        'make it casual':      'Rewrite this text in a friendly, casual tone',
+        'casual that':         'Rewrite this text in a friendly, casual tone',
+        'rewrite that':        'Rewrite this text to improve clarity and flow',
+        'improve that':        'Rewrite this text to improve clarity and flow',
+        'translate to english': 'Translate this text to English',
+      };
+      const instruction = TRANSFORMS[t];
+      if (instruction) {
+        this.onAITransformSelection?.(instruction);
+        return true;
+      }
     }
 
     // Template selection

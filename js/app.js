@@ -489,6 +489,10 @@ commandParser.onAIAcceptAll = () => {
   renderTranscript();
 };
 
+commandParser.onAITransformSelection = (instruction) => {
+  transformSelection(instruction);
+};
+
 // ══════════════════════════════════════════
 // VU Meter
 // ══════════════════════════════════════════
@@ -640,7 +644,7 @@ function clearAll() {
   const ph = document.createElement('span');
   ph.className = 'placeholder';
   ph.id = 'placeholder';
-  ph.textContent = 'Press SPACE or click START to begin dictating\u2026';
+  ph.textContent = 'Press SPACE or click START to dictate — or click here to type / paste text\u2026';
   el.appendChild(ph);
 
   const settings = loadSettings();
@@ -666,7 +670,7 @@ function renderTranscript() {
       const newPh = document.createElement('span');
       newPh.className = 'placeholder';
       newPh.id = 'placeholder';
-      newPh.textContent = 'Press SPACE or click START to begin dictating, or paste text here\u2026';
+      newPh.textContent = 'Press SPACE or click START to dictate — or click here to type / paste text\u2026';
       el.appendChild(newPh);
     } else {
       el.appendChild(ph);
@@ -1288,7 +1292,7 @@ function startNewSession() {
   const ph = document.createElement('span');
   ph.className = 'placeholder';
   ph.id = 'placeholder';
-  ph.textContent = 'Press SPACE or click START to begin dictating\u2026';
+  ph.textContent = 'Press SPACE or click START to dictate — or click here to type / paste text\u2026';
   el.appendChild(ph);
 
   const settings = loadSettings();
@@ -1441,7 +1445,59 @@ document.addEventListener('click', e => {
     state.rawTranscript = text;
     updateStats();
   });
+
+  // Track text selection so voice commands like "simplify that" know what to act on
+  raw.addEventListener('mouseup', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) { state.savedSelection = null; return; }
+    const text = sel.toString();
+    if (!text.trim()) { state.savedSelection = null; return; }
+    const plainText = raw.innerText;
+    const start = plainText.indexOf(text);
+    state.savedSelection = { text, start, end: start + text.length };
+  });
 })();
+
+// ══════════════════════════════════════════
+// Selection AI Transform
+// ══════════════════════════════════════════
+async function transformSelection(instruction) {
+  const sel = state.savedSelection;
+  if (!sel || !sel.text.trim()) { flashCmd('SELECT TEXT FIRST'); return; }
+
+  const model = aiClient.getSelectedModel();
+  flashCmd('TRANSFORMING…');
+
+  const systemPrompt = 'You are a text editor. Apply the requested transformation and return ONLY the transformed text — no explanation, no quotes, no prefix.';
+  const userPrompt = `${instruction}:\n\n${sel.text}`;
+
+  try {
+    const result = await aiClient.generate(model, userPrompt, systemPrompt, { temperature: 0.3 });
+    if (!result || !result.trim()) { flashCmd('TRANSFORM FAILED'); return; }
+
+    const trimmed = result.trim();
+    const current = state.rawTranscript;
+
+    // Offset-based replace (precise), falling back to first-occurrence
+    let next;
+    if (sel.start >= 0 && current.slice(sel.start, sel.end) === sel.text) {
+      next = current.slice(0, sel.start) + trimmed + current.slice(sel.end);
+    } else {
+      const idx = current.indexOf(sel.text);
+      if (idx === -1) { flashCmd('SELECTION MOVED'); return; }
+      next = current.slice(0, idx) + trimmed + current.slice(idx + sel.text.length);
+    }
+
+    commandParser.pushUndo();
+    state.rawTranscript = next;
+    state.savedSelection = null;
+    renderTranscript();
+    updateStats();
+    flashCmd('DONE');
+  } catch {
+    flashCmd('TRANSFORM FAILED');
+  }
+}
 
 // ══════════════════════════════════════════
 // Not Supported
