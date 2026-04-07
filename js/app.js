@@ -1899,8 +1899,7 @@ function init() {
   if (btnSetup) btnSetup.onclick = () => onboardingWizard.open();
 
   // Show on first launch
-  const settings = loadSettings();
-  if (!settings.firstLaunchCompleted) {
+  if (!loadSettings().firstLaunchCompleted) {
     onboardingWizard.open();
   }
 
