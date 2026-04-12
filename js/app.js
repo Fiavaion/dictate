@@ -1565,7 +1565,7 @@ function showServerSetup() {
           <div>git clone https://github.com/Fiavaion/dictate.git</div>
           <div>cd dictate</div>
           <div style="margin-top:8px">python server.py</div>
-          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:8080</div>
+          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:3000</div>
         </div>
         <p style="font-family:var(--body);font-size:0.72rem;color:var(--muted);line-height:1.5">
           For AI features, also install <a href="https://ollama.com" target="_blank" style="color:var(--ai-glow)">Ollama</a> and pull a model:<br>

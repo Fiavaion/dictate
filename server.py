@@ -29,7 +29,7 @@ def _check_rate_limit(ip: str) -> bool:
 
 DEFAULT_PROJECTS_ROOT = str(pathlib.Path.home() / "AIprojects")
 CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
-PORT = 8080
+PORT = 3000
 
 
 # ---------------------------------------------------------------------------
@@ -356,15 +356,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     _ALLOWED_ORIGINS = {
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "https://fiavaion.github.io",
     }
 
     def _cors_headers(self):
         """Add CORS headers — restrict to known origins only."""
         origin = self.headers.get("Origin", "")
-        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:8080"
+        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:3000"
         self.send_header("Access-Control-Allow-Origin", allowed)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")

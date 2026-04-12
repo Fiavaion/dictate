@@ -21,11 +21,11 @@ SERVER_PID=$!
 # ── Poll until server responds (max 20 seconds) ────────────────────────────────
 for i in $(seq 1 20); do
     sleep 1
-    python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/system/check', timeout=1)" 2>/dev/null && break
+    python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:3000/api/system/check', timeout=1)" 2>/dev/null && break
 done
 
 # ── Open browser ───────────────────────────────────────────────────────────────
-open "http://localhost:8080"
+open "http://localhost:3000"
 echo "FiavaionDictate is running. Close this Terminal window to stop the server."
 
 # Keep server alive

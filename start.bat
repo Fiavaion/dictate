@@ -26,14 +26,14 @@ start "FiavaionDictate Server" /min python server.py
 set /a n=0
 :poll
 timeout /t 1 /nobreak >nul
-powershell -Command "try{Invoke-WebRequest 'http://localhost:8080/api/system/check' -UseBasicParsing -TimeoutSec 1|Out-Null;exit 0}catch{exit 1}" >nul 2>&1
+powershell -Command "try{Invoke-WebRequest 'http://localhost:3000/api/system/check' -UseBasicParsing -TimeoutSec 1|Out-Null;exit 0}catch{exit 1}" >nul 2>&1
 if not errorlevel 1 goto open
 set /a n+=1
 if %n% lss 20 goto poll
 
 :: ── Open browser ─────────────────────────────────────────────────────────────
 :open
-start "" "http://localhost:8080"
+start "" "http://localhost:3000"
 echo  FiavaionDictate is running.
 echo  Close the "FiavaionDictate Server" taskbar window to stop it.
 timeout /t 4 /nobreak >nul
