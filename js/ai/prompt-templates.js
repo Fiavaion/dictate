@@ -120,6 +120,35 @@ Best,`,
       maxTokens: 1200,
     },
   },
+  claudecode: {
+    label: 'Claude Code',
+    description: 'Natural-language prompt for Claude Code — preserves intent, never fabricates specifics',
+    instruction: `Rewrite this dictated text as a clear natural-language prompt for Claude Code (an AI coding assistant).
+
+- Preserve the speaker's intent exactly — do NOT invent file paths, function names, variable names, line numbers, tech stacks, or any specifics the speaker did not mention
+- Expand terse, fragmented, or unclear phrasing so the intent is unambiguous
+- Elaborate where helpful — add connective phrasing, clarify pronouns, make implicit requests explicit
+- If the speaker was vague about a location, keep it vague (e.g. "in the relevant file", "wherever this is handled") and let Claude investigate
+- Keep it as natural conversational prose — do NOT impose markdown structure, bullet lists, or ## headers unless the speaker's content genuinely has multiple distinct parts
+- Project-agnostic: no assumptions about language, framework, or codebase
+- Do not add meta-instructions like "please" or "if possible" — write it as a direct request`,
+    systemPrompt: `You are preparing prompts for Claude Code. Transform dictated developer thoughts into clear natural-language prompts that will work in ANY project. Critical rule: never fabricate specifics. If the speaker said "that function" — keep it as "that function" or "the relevant function", never a guessed name. If they said "the file" — do not invent a path. Elaborate phrasing for clarity but never add details the speaker did not provide. Return plain prose unless multiple distinct parts genuinely warrant structure.`,
+    examples: [
+      {
+        input: `can you um look at the login function and like make sure it handles the case where the password is empty`,
+        output: `Look at the login function and make sure it handles the case where the password is empty. Check how the rest of the codebase handles empty-field validation and follow the same pattern.`,
+      },
+      {
+        input: `okay so the thing is broken uh when I click the button nothing happens so can you just figure out whats going on and fix it`,
+        output: `The button click handler is broken — clicking it produces no visible response. Investigate what's going on and fix it. Check the event wiring, any console errors, and whether the handler is being attached correctly.`,
+      },
+    ],
+    constraints: 'Return natural-language prose only. Never fabricate file paths, function names, or specifics. No markdown headers or bullet lists unless the content genuinely has multiple distinct parts. No preamble, no explanation of changes.',
+    parameters: {
+      temperature: 0.3,
+      maxTokens: 1200,
+    },
+  },
   developer: {
     label: 'Developer',
     description: 'Structured coding prompts for AI assistants',

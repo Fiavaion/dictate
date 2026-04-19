@@ -377,14 +377,14 @@ select.voice-select { min-width: 160px; max-width: 220px; }
 }
 .pane-copy-btn {
   font-family: var(--mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--dim);
   background: none;
-  border: 1px solid transparent;
-  padding: 2px 8px;
-  border-radius: 3px;
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
