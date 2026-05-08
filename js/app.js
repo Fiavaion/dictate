@@ -39,6 +39,7 @@ import { DiagramRenderer } from './ui/diagram-renderer.js';
 import { ContextInjector } from './ai/context-injector.js';
 import { GeminiWizard } from './ui/gemini-wizard.js';
 import { OnboardingWizard } from './ui/onboarding-wizard.js';
+import { SpeakAsYouType } from './stt/speak-as-you-type.js';
 
 // ══════════════════════════════════════════
 // State
@@ -301,6 +302,7 @@ const formatCardsModal = new FormatCardsModal(multiFormatter);
 const diagramGenerator = new DiagramGenerator(aiClient);
 const diagramRenderer = new DiagramRenderer();
 const contextInjector = new ContextInjector();
+const speakAsYouType = new SpeakAsYouType();
 
 const sttEngine = new WebSpeechEngine({
   lang: 'en-US',
@@ -368,6 +370,7 @@ const sttEngine = new WebSpeechEngine({
     // Feed to AI correction pipeline
     correctionPipeline.onNewText(autoPunct.process(text));
     _updateProcessBtn();
+    speakAsYouType.feed(state.rawTranscript);
 
     // Ghost predictor — reset pause timer on new activity
     ghostPredictor.onActivity(state.rawTranscript, promptStructurer.currentTemplate, $('projectContext')?.value || '');
@@ -413,6 +416,43 @@ const correctionPipeline = new CorrectionPipeline(aiClient, {
     flashCmd('AI ERROR');
   },
 });
+
+// ── Speak-as-you-type callbacks ──────────────────────────────────────────────
+speakAsYouType.onSpeechStart = (sentence) => {
+  speakAsYouType.setVoice(getSelectedVoice());
+  const bar = $('ttsBar');
+  if (!bar) return;
+  let html = '<span class="tts-bar-icon">▶ NOW READING</span><span class="tts-bar-text">';
+  let pos = 0;
+  for (const part of sentence.split(/(\s+)/)) {
+    if (part.trim()) {
+      html += `<span class="tts-word" data-start="${pos}" data-end="${pos + part.length}">${escapeHtml(part)}</span>`;
+    } else {
+      html += part;
+    }
+    pos += part.length;
+  }
+  html += '</span>';
+  bar.innerHTML = html;
+  bar.style.display = 'flex';
+};
+
+speakAsYouType.onWordBoundary = (_word, charIndex) => {
+  const bar = $('ttsBar');
+  if (!bar) return;
+  bar.querySelectorAll('.tts-word').forEach(el => el.classList.remove('active'));
+  for (const span of bar.querySelectorAll('.tts-word')) {
+    if (charIndex >= +span.dataset.start && charIndex < +span.dataset.end) {
+      span.classList.add('active');
+      break;
+    }
+  }
+};
+
+speakAsYouType.onSpeechEnd = () => {
+  const bar = $('ttsBar');
+  if (bar) bar.style.display = 'none';
+};
 
 const promptStructurer = new PromptStructurer(aiClient, {
   model: 'mistral:7b-instruct',
@@ -625,6 +665,7 @@ function clearAll() {
   state.currentSessionId = null;
   commandParser.reset();
   correctionPipeline.reset();
+  speakAsYouType.reset();
   confidenceHeatmap.clear();
   sessionTimeline.clear();
   sessionTimeline.record('clear');
@@ -889,6 +930,17 @@ async function doProcess() {
 }
 window.doProcess = doProcess;
 
+function toggleReadBack() {
+  speakAsYouType.enabled = !speakAsYouType.enabled;
+  $('btnReadBack')?.classList.toggle('btn-readback-on', speakAsYouType.enabled);
+  const s = loadSettings();
+  s.autoReadback = speakAsYouType.enabled;
+  saveSettings(s);
+  flashCmd(speakAsYouType.enabled ? 'READ BACK: ON' : 'READ BACK: OFF');
+  if (!speakAsYouType.enabled) speakAsYouType.cancel();
+}
+window.toggleReadBack = toggleReadBack;
+
 // ── TTS Voice ──
 const TTS_DEFAULT_VOICE = 'Google UK English Female';
 
@@ -938,6 +990,7 @@ function populateVoiceSelector() {
     const s = loadSettings();
     s.ttsVoice = sel.value;
     saveSettings(s);
+    speakAsYouType.setVoice(getSelectedVoice());
   };
 }
 
@@ -1817,6 +1870,12 @@ function init() {
 
   // Init TTS voice selector
   initVoiceSelector();
+
+  // Restore read-back setting
+  if (settings.autoReadback) {
+    speakAsYouType.enabled = true;
+    $('btnReadBack')?.classList.add('btn-readback-on');
+  }
 
   // Start AI panel closed by default
   state.aiPanelOpen = false;

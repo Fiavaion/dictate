@@ -127,11 +127,11 @@ export class OnboardingWizard {
   }
 
   _renderDots() {
-    const total = this._isGitHubPages ? 5 : 7;
+    const total = this._isGitHubPages ? 3 : 7;
     const dots = this._el.querySelector('#owDots');
     dots.innerHTML = Array.from({ length: total }, (_, i) => {
       const n = i + 1;
-      const actual = this._isGitHubPages ? [1, 4, 5, 6, 7][i] : n;
+      const actual = this._isGitHubPages ? [1, 6, 7][i] : n;
       const cls = actual === this._step ? 'active' : actual < this._step ? 'done' : '';
       return `<span class="ow-dot ${cls}"></span>`;
     }).join('');
@@ -145,42 +145,85 @@ export class OnboardingWizard {
   // ── Step 1: Welcome ──────────────────────────────────────────────────────────
 
   _step1(body, actions) {
-    body.innerHTML = `
-      <div class="ow-hero">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="22"/>
-          <line x1="8" y1="22" x2="16" y2="22"/>
-        </svg>
-      </div>
-      <div class="ow-title">Welcome to FiavaionDictate</div>
-      <div class="ow-desc">
-        Browser-based voice dictation with AI correction.<br>
-        This wizard will get you fully set up in a few minutes —
-        no technical knowledge required.
-      </div>
-      <div class="ow-checklist">
-        <div class="ow-check-item">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Set up local AI — free, private, works offline</span>
+    if (this._isGitHubPages) {
+      body.innerHTML = `
+        <div class="ow-hero">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
         </div>
-        <div class="ow-check-item">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Optional cloud AI for faster, smarter results</span>
+        <div class="ow-title">Speak — it types for you</div>
+        <div class="ow-desc" style="margin-bottom:16px">
+          Talk and your words appear on screen, automatically fixed for spelling and grammar.
+          Each sentence is read back aloud so you can hear what you said.
         </div>
-        <div class="ow-check-item">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Ready to dictate immediately after</span>
+        <div class="ow-checklist">
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span><strong>No typing needed</strong> — just speak</span>
+          </div>
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span><strong>Sentences read back</strong> — hear each sentence as it's written</span>
+          </div>
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span><strong>Free to use</strong> — uses Google's free AI tier</span>
+          </div>
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span><strong>Works in Chrome</strong> — no download, no install</span>
+          </div>
         </div>
-      </div>
-    `;
-    actions.innerHTML = `
-      <span></span>
-      <button class="btn-mic ow-btn-next" id="owNext"><span>GET STARTED →</span></button>
-    `;
-    this._el.querySelector('#owNext').onclick = () =>
-      this._goTo(this._isGitHubPages ? 4 : 2);
+      `;
+      actions.innerHTML = `
+        <span></span>
+        <button class="btn-mic ow-btn-next" id="owNext"><span>GET STARTED →</span></button>
+      `;
+      this._el.querySelector('#owNext').onclick = () => {
+        this._state.selectedProvider = 'google';
+        this._goTo(6);
+      };
+    } else {
+      body.innerHTML = `
+        <div class="ow-hero">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
+        </div>
+        <div class="ow-title">Welcome to FiavaionDictate</div>
+        <div class="ow-desc">
+          Voice dictation with automatic AI correction and sentence read-back.<br>
+          This wizard will get you set up in a few minutes —
+          no technical knowledge required.
+        </div>
+        <div class="ow-checklist">
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Set up local AI — free, private, works offline</span>
+          </div>
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Optional cloud AI for faster, smarter results</span>
+          </div>
+          <div class="ow-check-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Ready to dictate immediately after</span>
+          </div>
+        </div>
+      `;
+      actions.innerHTML = `
+        <span></span>
+        <button class="btn-mic ow-btn-next" id="owNext"><span>GET STARTED →</span></button>
+      `;
+      this._el.querySelector('#owNext').onclick = () => this._goTo(2);
+    }
   }
 
   // ── Step 2: System Check ─────────────────────────────────────────────────────
@@ -593,7 +636,7 @@ export class OnboardingWizard {
     this._el.querySelector('#owEye').onclick = () => {
       keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
     };
-    this._el.querySelector('#owBack').onclick = () => this._goTo(5);
+    this._el.querySelector('#owBack').onclick = () => this._goTo(this._isGitHubPages ? 1 : 5);
     this._el.querySelector('#owSkipKey').onclick = () => {
       this._state.selectedProvider = null;
       this._goTo(7);
@@ -663,6 +706,9 @@ export class OnboardingWizard {
       </div>
       <div class="ow-desc" style="margin-top:16px;font-size:0.75rem">
         Click the mic button and start talking. Your dictation will be automatically cleaned up by AI.
+      </div>
+      <div class="ow-desc" style="margin-top:10px;font-size:0.75rem;color:var(--accent2)">
+        <strong style="color:var(--accent2)">Tip:</strong> Click <strong>READ BACK</strong> in the toolbar to have each sentence read aloud as you dictate — so you can hear exactly what was written.
       </div>
     `;
     actions.innerHTML = `

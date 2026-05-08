@@ -872,6 +872,40 @@ footer {
 .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
 .btn-secondary.active { border-color: var(--ai-glow); color: var(--ai-glow); }
 
+/* READ BACK button — active state */
+.btn-readback-on {
+  border-color: var(--accent2) !important;
+  color: var(--accent2) !important;
+  background: color-mix(in srgb, var(--accent2) 8%, transparent) !important;
+}
+
+/* TTS "now reading" bar — pinned to bottom of raw pane */
+.tts-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 3;
+  padding: 7px 14px;
+  background: color-mix(in srgb, var(--panel) 94%, var(--accent2));
+  border-top: 1px solid color-mix(in srgb, var(--accent2) 35%, var(--border));
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.7;
+}
+.tts-bar-icon { color: var(--accent2); flex-shrink: 0; font-size: 0.62rem; letter-spacing: 0.1em; }
+.tts-bar-text { flex: 1; }
+.tts-word { display: inline; padding: 0 1px; border-radius: 2px; transition: background 0.07s, color 0.07s; }
+.tts-word.active {
+  background: color-mix(in srgb, var(--accent2) 28%, transparent);
+  color: var(--accent2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* PROCESS button — cloud AI manual trigger */
 .btn-process {
   border-color: color-mix(in srgb, var(--ai-glow) 40%, var(--border));

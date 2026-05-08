@@ -210,6 +210,7 @@
           <span class="placeholder" id="placeholder">Press SPACE or click START to begin dictating, or paste text here&#8230;</span>
         </div>
       </div>
+      <div id="ttsBar" class="tts-bar" style="display:none" role="status" aria-live="polite" aria-label="Currently reading"></div>
     </div>
 
     <!-- Divider -->
@@ -281,6 +282,7 @@
       <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
       <button class="btn-secondary" onclick="toggleCmdPanel()">COMMANDS</button>
       <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
+      <button class="btn-secondary" id="btnReadBack" onclick="toggleReadBack()" title="Automatically read back each sentence as you dictate">READ BACK</button>
       <button class="btn-secondary" id="btnProcess" onclick="doProcess()" style="display:none" title="Send accumulated text to cloud AI for correction">PROCESS</button>
       <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
       <button class="btn-secondary" onclick="toggleTimeline()">TIMELINE</button>
