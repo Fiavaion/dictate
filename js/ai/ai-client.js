@@ -61,6 +61,10 @@ const STORAGE_MODEL_PREFIX = 'fiavaion-ai-model-';
 const PROXY_URL = `${window.location.origin}/api/ai/proxy`;
 const MODELS_URL = `${window.location.origin}/api/ai/models`;
 
+// GitHub Pages: no local server — Gemini is called directly from the browser
+const _isGitHubPages = window.location.hostname === 'fiavaion.github.io';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
 // Dev-only logger — silent in production
 const _dev = ['localhost', '127.0.0.1'].includes(location.hostname);
 const _devWarn = (...args) => { if (_dev) console.warn(...args); };
@@ -300,6 +304,10 @@ export class AIClient {
       return ok ? { ok: true } : { ok: false, error: 'Cannot reach Ollama' };
     }
 
+    if (_isGitHubPages && this._provider === 'google') {
+      return this._checkConnectionDirect();
+    }
+
     const apiKey = this.getApiKey(this._provider);
     if (!apiKey) {
       this._connected = false;
@@ -394,12 +402,19 @@ export class AIClient {
       yield* this._generateOllama(model, prompt, systemPrompt, options, signal);
       return;
     }
+    if (_isGitHubPages && this._provider === 'google') {
+      yield* this._generateDirect(model, prompt, systemPrompt, options, signal);
+      return;
+    }
     yield* this._generateCloud(model, prompt, systemPrompt, options, signal);
   }
 
   async generateFull(model, prompt, systemPrompt, options = {}, signal) {
     if (this._provider === 'ollama') {
       return this._generateFullOllama(model, prompt, systemPrompt, options, signal);
+    }
+    if (_isGitHubPages && this._provider === 'google') {
+      return this._generateFullDirect(model, prompt, systemPrompt, options, signal);
     }
     return this._generateFullCloud(model, prompt, systemPrompt, options, signal);
   }
@@ -543,5 +558,85 @@ export class AIClient {
 
     const data = await res.json();
     return data.response || '';
+  }
+
+  // -------------------------------------------------------------------------
+  // Direct Gemini API — used on GitHub Pages (no server proxy available)
+  // -------------------------------------------------------------------------
+
+  _buildGeminiBody(prompt, systemPrompt, options) {
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: options.maxTokens || 1024,
+        temperature: options.temperature ?? 0.1,
+      },
+    };
+    if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+    return body;
+  }
+
+  async _checkConnectionDirect() {
+    const apiKey = this.getApiKey('google');
+    if (!apiKey) return { ok: false, error: 'No API key provided' };
+    try {
+      const model = this.getSelectedModel('google');
+      const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this._buildGeminiBody('Hi', 'Reply with just OK.', { maxTokens: 5, temperature: 0 })),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) { this._connected = true; return { ok: true }; }
+      this._connected = false;
+      try {
+        const body = await res.json();
+        const msg = body?.error?.message || `HTTP ${res.status}`;
+        const isRateLimit = msg.toLowerCase().includes('quota') || res.status === 429;
+        if (isRateLimit) { this._connected = true; return { ok: true }; }
+        return { ok: false, error: msg };
+      } catch { return { ok: false, error: `HTTP ${res.status}` }; }
+    } catch (e) {
+      this._connected = false;
+      if (e.name === 'TimeoutError') return { ok: false, error: 'Request timed out' };
+      return { ok: false, error: e.message || 'Network error' };
+    }
+  }
+
+  async *_generateDirect(model, prompt, systemPrompt, options, signal) {
+    const apiKey = this.getApiKey('google');
+    if (!apiKey) throw new Error('No API key for google');
+    const timeout = AbortSignal.timeout(options.timeoutMs || 30000);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this._buildGeminiBody(prompt, systemPrompt, options)),
+      signal: combined,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Gemini error ${res.status}: ${text}`);
+    }
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    yield { token: text, done: true };
+  }
+
+  async _generateFullDirect(model, prompt, systemPrompt, options, signal) {
+    const apiKey = this.getApiKey('google');
+    if (!apiKey) throw new Error('No API key for google');
+    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this._buildGeminiBody(prompt, systemPrompt, options)),
+      signal,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Gemini error ${res.status}: ${text}`);
+    }
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 }
