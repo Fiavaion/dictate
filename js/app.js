@@ -367,6 +367,7 @@ const sttEngine = new WebSpeechEngine({
 
     // Feed to AI correction pipeline
     correctionPipeline.onNewText(autoPunct.process(text));
+    _updateProcessBtn();
 
     // Ghost predictor — reset pause timer on new activity
     ghostPredictor.onActivity(state.rawTranscript, promptStructurer.currentTemplate, $('projectContext')?.value || '');
@@ -399,6 +400,7 @@ const correctionPipeline = new CorrectionPipeline(aiClient, {
     $('paneDivider')?.classList.remove('ai-active');
     renderRefined(fullText);
     renderCorrections(diffs);
+    _updateProcessBtn();
     autoSave();
     // Feed diffs to correction learner
     if (diffs && diffs.length > 0) {
@@ -879,6 +881,13 @@ async function doStructure({ force = false } = {}) {
   if (!text.trim()) { flashCmd('NOTHING TO STRUCTURE'); return; }
   await promptStructurer.structure(text);
 }
+
+async function doProcess() {
+  if (!state.rawTranscript.trim()) { flashCmd('NOTHING TO PROCESS'); return; }
+  flashCmd('PROCESSING…');
+  await correctionPipeline.forceCorrect();
+}
+window.doProcess = doProcess;
 
 // ── TTS Voice ──
 const TTS_DEFAULT_VOICE = 'Google UK English Female';
@@ -1839,6 +1848,7 @@ function init() {
     promptStructurer.setModel(model);
     _refreshAIConnection();
     _updateWizardButton();
+    _updateProcessBtn();
   };
   const btnAISettings = $('btnAISettings');
   if (btnAISettings) {
@@ -1862,6 +1872,7 @@ function init() {
     flashCmd('GEMINI CLOUD AI ACTIVATED');
   };
   _updateWizardButton();
+  _updateProcessBtn();
   const btnWizard = $('btnGeminiWizard');
   if (btnWizard) btnWizard.onclick = () => geminiWizard.open();
 
@@ -2109,8 +2120,23 @@ function setAIMode(mode) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
 
+  // Show PROCESS button for cloud providers (manual trigger to conserve API quota)
+  _updateProcessBtn();
+
   // Refresh model selector and re-check connection
   _refreshAIConnection();
+}
+
+function _updateProcessBtn() {
+  const btn = $('btnProcess');
+  if (!btn) return;
+  const isCloud = aiClient.providerConfig && !aiClient.providerConfig.local;
+  btn.style.display = isCloud ? '' : 'none';
+  if (!isCloud) return;
+  const wordCount = correctionPipeline.pendingWordCount;
+  btn.classList.toggle('btn-process', true);
+  btn.classList.toggle('has-pending', wordCount > 0);
+  btn.textContent = wordCount > 0 ? `PROCESS · ${wordCount}w` : 'PROCESS';
 }
 
 function _updateWizardButton() {

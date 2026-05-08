@@ -872,6 +872,22 @@ footer {
 .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
 .btn-secondary.active { border-color: var(--ai-glow); color: var(--ai-glow); }
 
+/* PROCESS button — cloud AI manual trigger */
+.btn-process {
+  border-color: color-mix(in srgb, var(--ai-glow) 40%, var(--border));
+  color: var(--ai-glow);
+}
+.btn-process:hover { border-color: var(--ai-glow); color: var(--ai-glow); }
+.btn-process.has-pending {
+  border-color: var(--ai-glow);
+  background: color-mix(in srgb, var(--ai-glow) 8%, transparent);
+  animation: processPulse 2s ease-in-out infinite;
+}
+@keyframes processPulse {
+  0%, 100% { box-shadow: 0 0 6px color-mix(in srgb, var(--ai-glow) 20%, transparent); }
+  50%       { box-shadow: 0 0 18px color-mix(in srgb, var(--ai-glow) 50%, transparent); border-color: color-mix(in srgb, var(--ai-glow) 80%, white); }
+}
+
 /* Copy dropdown */
 .copy-group {
   margin-left: auto;

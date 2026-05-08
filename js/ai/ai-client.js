@@ -6,6 +6,17 @@
 
 import { OllamaClient } from './ollama-client.js';
 
+// Anthropic model families — used to group and label discovered models
+const ANTHROPIC_FAMILIES = ['haiku', 'sonnet', 'opus'];
+const ANTHROPIC_FAMILY_LABELS = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus' };
+
+// Fallback models used when server is unreachable or no key is set yet
+const ANTHROPIC_FALLBACK_MODELS = [
+  { name: 'claude-haiku-4-5', label: 'Haiku (latest)' },
+  { name: 'claude-sonnet-4-6', label: 'Sonnet (latest)' },
+  { name: 'claude-opus-4-7', label: 'Opus (latest)' },
+];
+
 const PROVIDERS = {
   ollama: {
     label: 'Ollama',
@@ -16,11 +27,7 @@ const PROVIDERS = {
   anthropic: {
     label: 'Anthropic',
     defaultModel: 'claude-haiku-4-5',
-    models: [
-      { name: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-      { name: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-      { name: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
-    ],
+    models: ANTHROPIC_FALLBACK_MODELS,
     local: false,
   },
   openai: {
@@ -50,9 +57,9 @@ const STORAGE_PROVIDER = 'fiavaion-ai-provider';
 const STORAGE_KEY_PREFIX = 'fiavaion-ai-apikey-';
 const STORAGE_MODEL_PREFIX = 'fiavaion-ai-model-';
 
-// Proxy endpoint — always use the full URL so there's no ambiguity about
-// which server the browser is talking to.
+// Server endpoints — always use full URL to avoid ambiguity
 const PROXY_URL = `${window.location.origin}/api/ai/proxy`;
+const MODELS_URL = `${window.location.origin}/api/ai/models`;
 
 // Dev-only logger — silent in production
 const _dev = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -145,6 +152,49 @@ export class AIClient {
         }
       }
     }
+    // Discover latest Anthropic models in the background if a key exists
+    if (this._keyCache.anthropic) this.fetchLatestModels();
+  }
+
+  /**
+   * Query Anthropic's /v1/models API via the local proxy and update the
+   * model list with the newest Haiku, Sonnet, and Opus available.
+   * Falls back to static ANTHROPIC_FALLBACK_MODELS on any error.
+   * Returns true if discovery succeeded.
+   */
+  async fetchLatestModels() {
+    const apiKey = this.getApiKey('anthropic');
+    if (!apiKey) return false;
+    try {
+      const res = await fetch(MODELS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'anthropic', apiKey }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return false;
+      const { models } = await res.json();
+      if (!Array.isArray(models) || models.length === 0) return false;
+
+      const discovered = [];
+      for (const family of ANTHROPIC_FAMILIES) {
+        const matches = models
+          .filter(m => m.id && m.id.startsWith('claude-') && m.id.includes(family))
+          .sort((a, b) => b.id.localeCompare(a.id));
+        if (matches.length > 0) {
+          discovered.push({
+            name: matches[0].id,
+            label: `${ANTHROPIC_FAMILY_LABELS[family]} (latest)`,
+          });
+        }
+      }
+
+      if (discovered.length > 0) {
+        this._providerModels.anthropic = discovered;
+        return true;
+      }
+    } catch { /* network error or GitHub Pages — fall back silently */ }
+    return false;
   }
 
   // -------------------------------------------------------------------------

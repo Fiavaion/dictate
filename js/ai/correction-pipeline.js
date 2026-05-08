@@ -55,6 +55,7 @@ export class CorrectionPipeline {
   }
 
   get isActive() { return this._correcting; }
+  get pendingWordCount() { return this.pendingRaw.trim() ? this.pendingRaw.trim().split(/\s+/).length : 0; }
 
   get correctedText() {
     const segments = [...this.correctedSegments];

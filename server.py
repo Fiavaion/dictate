@@ -228,6 +228,17 @@ def _upstream_request(url, body_bytes, headers):
     return urllib.request.urlopen(req, context=_SSL_CTX, timeout=60)
 
 
+def _list_anthropic_models(api_key):
+    """Fetch available models from Anthropic /v1/models (GET)."""
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/models",
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"},
+    )
+    resp = urllib.request.urlopen(req, context=_SSL_CTX, timeout=10)
+    data = json.loads(resp.read().decode("utf-8"))
+    return data.get("data", [])
+
+
 def _call_anthropic(api_key, model, prompt, system_prompt, stream, options):
     """Call Anthropic Messages API. Returns (response_obj, provider_name)."""
     body = json.dumps({
@@ -441,6 +452,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._handle_set_projects_root()
         elif path == "/api/ai/proxy":
             self._handle_ai_proxy()
+        elif path == "/api/ai/models":
+            self._handle_ai_models()
         else:
             self._json_error(404, "Not found")
 
@@ -467,6 +480,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_ok({"path": msg})
         else:
             self._json_error(400, msg)
+
+    def _handle_ai_models(self):
+        """Return the list of available models for a cloud provider."""
+        try:
+            data = self._read_body_json()
+        except Exception:
+            self._json_error(400, "Invalid JSON")
+            return
+
+        provider = data.get("provider", "")
+        api_key = data.get("apiKey", "")
+
+        if not provider or not api_key:
+            self._json_error(400, "Missing provider or apiKey")
+            return
+
+        try:
+            if provider == "anthropic":
+                models = _list_anthropic_models(api_key)
+                self._json_ok({"models": models})
+            else:
+                self._json_error(400, f"Model listing not supported for: {provider}")
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", errors="replace")
+            self._json_error(e.code, _safe_error_message(e.code, raw))
+        except Exception:
+            self._json_error(502, "Failed to fetch models")
 
     def _handle_ai_proxy(self):
         """Proxy a cloud AI request to Anthropic, OpenAI, or Google."""

@@ -153,6 +153,12 @@ export class APISettingsModal {
         const key = keyInput.value.trim();
         if (key) {
           this.client.setApiKey(provider, key, rememberCb?.checked ?? true);
+          // Discover latest models after a new key is saved
+          if (provider === 'anthropic') {
+            this.client.fetchLatestModels().then(ok => {
+              if (ok) this._renderTab(provider);
+            });
+          }
         } else {
           this.client.clearApiKey(provider);
         }
