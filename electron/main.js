@@ -24,11 +24,6 @@ async function createWindow() {
     callback(false);
   });
 
-  session.defaultSession.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
   const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
