@@ -4,23 +4,12 @@
  * extracts key entity names (components, routes, functions), and provides
  * a context string for injection into AI prompts (correction + structuring).
  *
- * ── Required Server Endpoint (NOT YET IMPLEMENTED) ──────────────────────
+ * ── Server Endpoint ─────────────────────────────────────────────────────
  *
- *   GET /api/projects/{name}/scan
+ *   GET /api/projects/{name}/scan  (implemented in server.py scan_project)
  *
- *   Walks the project directory (max depth 4), collects file paths excluding
- *   common noise directories (node_modules, .git, dist, build, __pycache__,
- *   .next, .nuxt, .svelte-kit, venv, .venv, .tox, target, out, coverage).
- *
- *   Response: {
- *     name:  string,          // project folder name
- *     stack: string,          // detected tech stack (from detect_stack())
- *     files: string[]         // flat list of relative file paths
- *   }
- *
- *   Should reuse the existing detect_stack() helper in server.py.
- *   Implementation belongs in server.py Handler.do_GET, matching path
- *   pattern /api/projects/<name>/scan.
+ *   Walks the project directory (max depth 4), excludes noise directories,
+ *   and returns { name, stack, files[] } where stack comes from detect_stack().
  *
  * ────────────────────────────────────────────────────────────────────────
  */
@@ -186,23 +175,6 @@ export class ContextInjector {
    */
   invalidateCache(projectName) {
     delete this._cache[projectName];
-  }
-
-  /**
-   * Clear all context state and cache.
-   */
-  clear() {
-    this.projectContext = null;
-    this.fileTree = [];
-    this.keyEntities = [];
-  }
-
-  /**
-   * Clear everything including the cache.
-   */
-  clearAll() {
-    this.clear();
-    this._cache = {};
   }
 
   // ── Internal Helpers ────────────────────────────────────────────────

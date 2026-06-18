@@ -17,8 +17,6 @@ import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
   loadSessionsIndex, saveSessionToList, loadSavedSession, deleteSessionFromList,
   renameSession, exportSessions, importSessions } from './utils/persistence.js';
 import { fetchProjects, sortByModified, sortByName, saveProjectSettings, loadProjectSettings } from './utils/projects.js';
-
-// ── New modules ──
 import { PromptBuilder } from './ui/prompt-builder.js';
 import { AmbientDetector } from './stt/ambient-detector.js';
 import { CorrectionLearner } from './stt/correction-learner.js';
@@ -52,8 +50,8 @@ const state = {
   sessionTimer: null,
   lastConfidence: 0,
   aiPanelOpen: true,
-  diffViewOn: false,
   structuredPrompt: '',
+  savedSelection: null,
   copyMenuOpen: false,
   autoSaveTimer: null,
   structureView: false,
@@ -282,8 +280,6 @@ const aiClient = new AIClient();
 const apiSettingsModal = new APISettingsModal(aiClient);
 const geminiWizard = new GeminiWizard(aiClient);
 const onboardingWizard = new OnboardingWizard(aiClient, geminiWizard);
-
-// ── New module instances ──
 const promptBuilder = new PromptBuilder(aiClient);
 const ambientDetector = new AmbientDetector();
 const correctionLearner = new CorrectionLearner();
@@ -513,7 +509,6 @@ commandParser.onAIStructure = () => doStructure();
 commandParser.onAISetTemplate = (name) => {
   if (promptStructurer.setTemplate(name)) renderTemplateSelector();
 };
-commandParser.onAIShowDiff = () => toggleDiffView();
 commandParser.onAIReadBack = () => readBack();
 commandParser.onToggleAIPanel = () => toggleAIPanel();
 commandParser.onNewSession = () => startNewSession();
@@ -630,10 +625,10 @@ async function startRecording() {
   $('btnMic').classList.add('recording');
   $('btnLabel').textContent = 'STOP';
 
-  if (!state.sessionStart) {
-    state.sessionStart = Date.now();
-    state.sessionTimer = setInterval(updateSessionTime, 1000);
-  }
+  if (!state.sessionStart) state.sessionStart = Date.now();
+  // Always (re)start the timer — a stop/start within a session must not freeze the clock.
+  clearInterval(state.sessionTimer);
+  state.sessionTimer = setInterval(updateSessionTime, 1000);
 }
 
 function stopRecording() {
@@ -882,17 +877,6 @@ function toggleAIPanel() {
   state.aiPanelOpen = !state.aiPanelOpen;
   $('app').classList.toggle('ai-panel-open', state.aiPanelOpen);
   $('btnAI')?.classList.toggle('active', state.aiPanelOpen);
-}
-
-function toggleDiffView() {
-  state.diffViewOn = !state.diffViewOn;
-  // Simple diff: show raw in refined pane with strikethrough for changed words
-  if (state.diffViewOn) {
-    flashCmd('DIFF ON');
-  } else {
-    flashCmd('DIFF OFF');
-    renderRefined(correctionPipeline.correctedText);
-  }
 }
 
 function renderStructuredInPane(text) {
@@ -1453,7 +1437,6 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.shiftKey) {
     if (e.code === 'KeyA') { e.preventDefault(); toggleAIPanel(); }
     if (e.code === 'KeyS') { e.preventDefault(); doStructure(); }
-    if (e.code === 'KeyD') { e.preventDefault(); toggleDiffView(); }
     if (e.code === 'KeyC') { e.preventDefault(); copyRefined(); }
     if (e.code === 'KeyR') { e.preventDefault(); copyRaw(); }
     if (e.code === 'KeyV') { e.preventDefault(); copyToClaude(); }
@@ -2071,7 +2054,6 @@ function init() {
   // Detect if running without local server (e.g. GitHub Pages)
   detectServerMode();
 
-  // ── New module init ──
   // Timeline viewer — render into timeline container
   timelineViewer.render('timelineContainer');
 

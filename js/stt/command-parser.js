@@ -21,7 +21,6 @@ export class CommandParser {
     this.onAISetTemplate = null;   // (name) => void
     this.onAIIgnoreLast = null;    // () => void
     this.onAIAcceptAll = null;     // () => void
-    this.onAIShowDiff = null;      // () => void
     this.onAIReadBack = null;      // () => void
 
     // Navigation/control callbacks
@@ -216,9 +215,6 @@ export class CommandParser {
     }
     if (t === 'ai structure this' || t === 'structure this') {
       this.onAIStructure?.(); this._flash('AI STRUCTURING'); return true;
-    }
-    if (t === 'ai show diff' || t === 'show diff') {
-      this.onAIShowDiff?.(); this._flash('DIFF VIEW'); return true;
     }
     if (t === 'ai read back' || t === 'read back') {
       this.onAIReadBack?.(); this._flash('READING BACK'); return true;
