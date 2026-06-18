@@ -63,13 +63,16 @@ export class AnalyticsDashboard {
 
     const modal = document.createElement('div');
     modal.className = 'analytics-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'analyticsTitle');
 
     // Header
     const header = document.createElement('div');
     header.className = 'analytics-header';
     header.innerHTML = `
-      <span class="analytics-title">ANALYTICS</span>
-      <button class="analytics-close">&times;</button>
+      <span class="analytics-title" id="analyticsTitle">ANALYTICS</span>
+      <button class="analytics-close" aria-label="Close analytics">&times;</button>
     `;
     header.querySelector('.analytics-close').addEventListener('click', () => this.close());
     modal.appendChild(header);
@@ -90,6 +93,7 @@ export class AnalyticsDashboard {
     modal.appendChild(body);
     this._el.appendChild(modal);
     document.body.appendChild(this._el);
+    this._el.querySelector('.analytics-close')?.focus();
 
     // Escape key to close
     this._onKeyDown = (e) => { if (e.key === 'Escape') this.close(); };
@@ -200,6 +204,8 @@ export class AnalyticsDashboard {
       viewBox: `0 0 ${chartWidth} ${svgHeight}`,
       class: 'analytics-chart-svg',
       preserveAspectRatio: 'xMinYMin meet',
+      role: 'img',
+      'aria-label': 'Words per session across recent sessions',
     });
 
     recent.forEach((session, i) => {
@@ -302,6 +308,8 @@ export class AnalyticsDashboard {
       viewBox: `0 0 ${chartWidth} ${chartHeight}`,
       class: 'analytics-chart-svg',
       preserveAspectRatio: 'xMinYMin meet',
+      role: 'img',
+      'aria-label': 'Activity timeline by session',
     });
 
     // Baseline
@@ -392,6 +400,8 @@ export class AnalyticsDashboard {
       viewBox: `0 0 ${chartSize + 200} ${chartSize}`,
       class: 'analytics-chart-svg analytics-chart-donut',
       preserveAspectRatio: 'xMinYMin meet',
+      role: 'img',
+      'aria-label': 'Template usage distribution',
     });
 
     let currentAngle = -Math.PI / 2;  // start at top

@@ -20,12 +20,13 @@
 </style>
 </head>
 <body>
+<a href="#rawContent" class="skip-link">Skip to dictation</a>
 
 <canvas id="waveCanvas"></canvas>
-<div id="cmdToast"></div>
+<div id="cmdToast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ══════ Commands Reference Panel ══════ -->
-<div class="cmd-panel" id="cmdPanel">
+<div class="cmd-panel" id="cmdPanel" role="region" aria-label="Voice commands reference" tabindex="-1">
   <button class="cmd-close" onclick="toggleCmdPanel()">CLOSE</button>
   <h3>VOICE COMMANDS</h3>
 
@@ -125,7 +126,7 @@
   <!-- HEADER -->
   <header>
     <div class="header-row-1">
-      <div class="logo">FIAVAION<span>.</span>DICTATE</div>
+      <div class="logo" role="heading" aria-level="1">FIAVAION<span>.</span>DICTATE</div>
       <div class="header-status">
         <div class="vu-meter" id="vuMeter"></div>
         <div class="status-pill" id="statusPill"><div class="dot"></div><span id="statusText">READY</span></div>
@@ -149,7 +150,7 @@
 
     <div class="header-row-2">
       <div class="project-selector" id="projectSelectorWrap">
-        <select class="ui-select" id="projectSelect">
+        <select class="ui-select" id="projectSelect" aria-label="Project">
           <option value="">— Project —</option>
         </select>
         <button class="btn-sort" id="btnSortProjects" title="Sort: Recent first" aria-label="Sort projects">&#9201;</button>
@@ -178,10 +179,10 @@
       <select class="ui-select lang-select" id="langSelect" style="display:none">
         <option value="en-GB" selected>EN-GB</option>
       </select>
-      <select class="ui-select voice-select" id="voiceSelect"></select>
+      <select class="ui-select voice-select" id="voiceSelect" aria-label="Voice"></select>
 
       <div class="model-selector">
-        <select class="ui-select" id="modelSelect">
+        <select class="ui-select" id="modelSelect" aria-label="AI model">
           <option value="gemma3:4b">gemma3:4b</option>
         </select>
       </div>
@@ -189,7 +190,7 @@
   </header>
 
   <!-- TRANSCRIPT — Dual Pane -->
-  <div class="transcript-zone">
+  <div class="transcript-zone" role="main" aria-label="Dictation workspace">
     <!-- Raw dictation pane -->
     <div class="pane-header">
       <div class="pane-label">RAW DICTATION</div>
@@ -205,7 +206,7 @@
       <label>Leading <input type="range" min="100" max="300" value="175" data-pane="raw" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper raw-pane">
-      <div class="transcript-scroll" id="rawScroll">
+      <div class="transcript-scroll" id="rawScroll" role="log" aria-live="polite" aria-atomic="false" aria-label="Raw dictation transcript">
         <div class="transcript-content" id="rawContent" contenteditable="true" spellcheck="false">
           <span class="placeholder" id="placeholder">Press SPACE or click START to begin dictating, or paste text here&#8230;</span>
         </div>
@@ -231,7 +232,7 @@
       <label>Leading <input type="range" min="100" max="300" value="175" data-pane="refined" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper refined-pane">
-      <div class="transcript-scroll" id="refinedScroll">
+      <div class="transcript-scroll" id="refinedScroll" role="log" aria-live="polite" aria-atomic="false" aria-label="AI-corrected output">
         <div class="transcript-content" id="refinedContent">
           <span class="placeholder">AI-corrected text will appear here&#8230;</span>
         </div>
@@ -243,13 +244,13 @@
   <div id="timelineContainer"></div>
 
   <!-- AI SIDEBAR -->
-  <div class="ai-sidebar" id="aiSidebar">
+  <div class="ai-sidebar" id="aiSidebar" role="complementary" aria-label="AI corrections and settings">
     <!-- Corrections (collapsible) -->
     <div class="corrections-compact">
-      <div class="corrections-compact-header" onclick="toggleCorrections()">
+      <button type="button" class="corrections-compact-header" onclick="toggleCorrections()" aria-expanded="false" aria-controls="correctionList">
         <span class="ai-section-title corrections-title">CORRECTIONS</span>
         <span class="corrections-count" id="correctionCount">0</span>
-      </div>
+      </button>
       <div class="correction-list corrections-collapsed" id="correctionList">
         <div class="correction-empty">No corrections yet</div>
       </div>
@@ -291,12 +292,12 @@
       <div class="footer-templates">
         <span class="footer-template-label">TEMPLATE</span>
         <div class="template-selector" id="templateSelector"></div>
-        <button class="btn-secondary" onclick="openPromptBuilder()" title="Build custom template" style="padding:4px 8px;font-size:0.55rem">+</button>
+        <button class="btn-secondary" onclick="openPromptBuilder()" title="Build custom template" aria-label="Build custom template" style="padding:4px 8px;font-size:0.55rem">+</button>
       </div>
 
       <div class="ai-mode-group" title="AI provider mode">
         <label class="toggle">
-          <input type="checkbox" id="aiToggle" checked>
+          <input type="checkbox" id="aiToggle" checked aria-label="Enable AI correction">
           <div class="toggle-track"></div>
           <div class="toggle-thumb"></div>
         </label>
@@ -308,7 +309,7 @@
 
       <div class="copy-group">
         <button class="btn-copy" id="btnCopy" onclick="copyRefined()">COPY</button>
-        <button class="btn-copy-menu" onclick="toggleCopyMenu()">&#9662;</button>
+        <button class="btn-copy-menu" onclick="toggleCopyMenu()" aria-label="Copy options" aria-haspopup="true" aria-expanded="false">&#9662;</button>
         <div class="copy-dropdown" id="copyDropdown">
           <button class="copy-option" onclick="copyRaw()">Copy Raw</button>
           <button class="copy-option" onclick="copyRefined()">Copy Refined</button>

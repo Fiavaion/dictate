@@ -14,6 +14,7 @@ export class APISettingsModal {
     if (!this._el) this.render();
     this._el.style.display = 'flex';
     this._renderTab(this._activeTab);
+    this._el.querySelector('#aiSettingsClose')?.focus();
   }
 
   close() {
@@ -32,9 +33,9 @@ export class APISettingsModal {
     });
 
     overlay.innerHTML = `
-      <div class="folder-modal" style="max-width:520px;min-height:380px;display:flex;flex-direction:column">
+      <div class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="aiSettingsTitle" style="max-width:520px;min-height:380px;display:flex;flex-direction:column">
         <div class="folder-modal-header">
-          <span class="folder-modal-title" style="color:var(--ai-glow)">AI PROVIDER SETTINGS</span>
+          <span class="folder-modal-title" id="aiSettingsTitle" style="color:var(--ai-glow)">AI PROVIDER SETTINGS</span>
           <button class="folder-modal-close" id="aiSettingsClose">&times;</button>
         </div>
         <div class="ai-settings-tabs" id="aiSettingsTabs"></div>
@@ -110,7 +111,7 @@ export class APISettingsModal {
         <label class="ai-settings-label">API Key</label>
         <div class="ai-settings-key-row">
           <input class="ai-settings-input" id="aiSettingsApiKey" type="password" value="${hasKey ? apiKey : ''}" placeholder="Enter API key" style="flex:1">
-          <button class="ai-settings-eye" id="aiSettingsEyeBtn" title="Show/hide key">
+          <button class="ai-settings-eye" id="aiSettingsEyeBtn" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
@@ -130,7 +131,10 @@ export class APISettingsModal {
       const keyInput = this._el.querySelector('#aiSettingsApiKey');
       if (eyeBtn && keyInput) {
         eyeBtn.onclick = () => {
-          keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+          const show = keyInput.type === 'password';
+          keyInput.type = show ? 'text' : 'password';
+          eyeBtn.setAttribute('aria-pressed', String(show));
+          eyeBtn.setAttribute('aria-label', show ? 'Hide API key' : 'Show API key');
         };
       }
     }

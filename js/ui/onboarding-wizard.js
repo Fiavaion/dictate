@@ -82,6 +82,7 @@ export class OnboardingWizard {
     this._step = 1;
     this._el.style.display = 'flex';
     this._renderStep();
+    this._el.querySelector('#owClose')?.focus();
   }
 
   close() {
@@ -557,9 +558,9 @@ export class OnboardingWizard {
 
   _step5(body, actions) {
     const cards = CLOUD_PROVIDERS.map(p => `
-      <div class="ow-provider-card${p.recommended ? ' ow-provider-recommended' : ''}" data-provider="${p.key}" id="owCard-${p.key}">
+      <div class="ow-provider-card${p.recommended ? ' ow-provider-recommended' : ''}" data-provider="${p.key}" id="owCard-${p.key}" role="radio" tabindex="0" aria-checked="false">
         <div class="ow-provider-badge" style="background:color-mix(in srgb,${p.badgeColor} 15%,var(--surface));color:${p.badgeColor}">${p.badge}</div>
-        <div class="ow-provider-name">${p.name}</div>
+        <div class="ow-provider-name">${p.name}${p.recommended ? '<span class="sr-only"> (recommended)</span>' : ''}</div>
         <div class="ow-provider-by">by ${p.by}</div>
         <div class="ow-provider-desc">${p.desc}</div>
         <div class="ow-provider-detail">${p.detail}</div>
@@ -569,7 +570,7 @@ export class OnboardingWizard {
     body.innerHTML = `
       <div class="ow-title">Choose a Cloud Provider</div>
       <div class="ow-desc" style="margin-bottom:16px">Gemini has a generous free tier — great for most users.</div>
-      <div class="ow-provider-grid">${cards}</div>
+      <div class="ow-provider-grid" role="radiogroup" aria-label="Cloud provider">${cards}</div>
     `;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
@@ -578,17 +579,28 @@ export class OnboardingWizard {
 
     // Pre-select Gemini
     this._state.selectedProvider = 'google';
-    this._el.querySelector('#owCard-google')?.classList.add('selected');
+    const geminiCard = this._el.querySelector('#owCard-google');
+    geminiCard?.classList.add('selected');
+    geminiCard?.setAttribute('aria-checked', 'true');
 
     const next = this._el.querySelector('#owNext');
     next.disabled = false;
 
+    const selectCard = (card) => {
+      this._el.querySelectorAll('.ow-provider-card').forEach(c => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-checked', 'false');
+      });
+      card.classList.add('selected');
+      card.setAttribute('aria-checked', 'true');
+      this._state.selectedProvider = card.dataset.provider;
+      next.disabled = false;
+    };
+
     this._el.querySelectorAll('.ow-provider-card').forEach(card => {
-      card.onclick = () => {
-        this._el.querySelectorAll('.ow-provider-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        this._state.selectedProvider = card.dataset.provider;
-        next.disabled = false;
+      card.onclick = () => selectCard(card);
+      card.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCard(card); }
       };
     });
 
@@ -617,7 +629,7 @@ export class OnboardingWizard {
       <div class="ow-field" style="margin-top:16px">
         <div class="gw-key-row">
           <input class="ai-settings-input" id="owApiKey" type="password" value="${escHtml(existing)}" placeholder="${p.keyPlaceholder}" style="flex:1">
-          <button class="ai-settings-eye" id="owEye" title="Show/hide key">
+          <button class="ai-settings-eye" id="owEye" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
@@ -637,8 +649,11 @@ export class OnboardingWizard {
     `;
 
     const keyInput = this._el.querySelector('#owApiKey');
-    this._el.querySelector('#owEye').onclick = () => {
-      keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+    this._el.querySelector('#owEye').onclick = (e) => {
+      const show = keyInput.type === 'password';
+      keyInput.type = show ? 'text' : 'password';
+      e.currentTarget.setAttribute('aria-pressed', String(show));
+      e.currentTarget.setAttribute('aria-label', show ? 'Hide API key' : 'Show API key');
     };
     this._el.querySelector('#owBack').onclick = () => this._goTo(this._isGitHubPages ? 1 : 5);
     this._el.querySelector('#owSkipKey').onclick = () => {

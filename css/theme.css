@@ -1288,3 +1288,40 @@ canvas#waveCanvas {
 }
 .folder-modal-list::-webkit-scrollbar { width: 4px; }
 .folder-modal-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Accessibility ─────────────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 2000;
+  padding: 8px 14px;
+  background: var(--accent, #35C280);
+  color: #0e0e14;
+  border-radius: 4px;
+  font-family: var(--mono, monospace);
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus { top: 8px; }
+
+/* The corrections header is a <button>; strip UA chrome so it matches the design. */
+button.corrections-compact-header {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+/* Respect users who prefer reduced motion (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

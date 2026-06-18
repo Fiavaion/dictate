@@ -3,6 +3,9 @@
  * Follows the APISettingsModal pattern (self-contained modal + injected styles).
  */
 
+const gwEsc = (s) => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 export class GeminiWizard {
   constructor(aiClient) {
     this.client = aiClient;
@@ -20,6 +23,7 @@ export class GeminiWizard {
     this._step = 1;
     this._el.style.display = 'flex';
     this._renderStep();
+    this._el.querySelector('#gwClose')?.focus();
   }
 
   close() {
@@ -38,9 +42,9 @@ export class GeminiWizard {
     });
 
     overlay.innerHTML = `
-      <div class="folder-modal" style="max-width:460px;display:flex;flex-direction:column">
+      <div class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="gwTitle" style="max-width:460px;display:flex;flex-direction:column">
         <div class="folder-modal-header">
-          <span class="folder-modal-title" style="color:var(--ai-glow)">GEMINI SETUP</span>
+          <span class="folder-modal-title" id="gwTitle" style="color:var(--ai-glow)">GEMINI SETUP</span>
           <div class="gw-dots" id="gwDots"></div>
           <button class="folder-modal-close" id="gwClose">&times;</button>
         </div>
@@ -136,8 +140,8 @@ export class GeminiWizard {
     body.innerHTML = `
       <div class="gw-title">Paste Your API Key</div>
       <div class="gw-key-row">
-        <input class="ai-settings-input" id="gwApiKey" type="password" value="${existing}" placeholder="AIza..." style="flex:1">
-        <button class="ai-settings-eye" id="gwEye" title="Show/hide key">
+        <input class="ai-settings-input" id="gwApiKey" type="password" value="${gwEsc(existing)}" placeholder="AIza..." style="flex:1">
+        <button class="ai-settings-eye" id="gwEye" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
             <circle cx="12" cy="12" r="3"/>
@@ -156,8 +160,11 @@ export class GeminiWizard {
     `;
 
     const keyInput = this._el.querySelector('#gwApiKey');
-    this._el.querySelector('#gwEye').onclick = () => {
-      keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+    this._el.querySelector('#gwEye').onclick = (e) => {
+      const show = keyInput.type === 'password';
+      keyInput.type = show ? 'text' : 'password';
+      e.currentTarget.setAttribute('aria-pressed', String(show));
+      e.currentTarget.setAttribute('aria-label', show ? 'Hide API key' : 'Show API key');
     };
     this._el.querySelector('#gwBack').onclick = () => this._goTo(2);
     this._el.querySelector('#gwTest').onclick = () => this._testKey();

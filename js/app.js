@@ -814,7 +814,9 @@ function renderCorrections(diffs) {
 function toggleCorrections() {
   const list = $('correctionList');
   list.classList.toggle('corrections-collapsed');
-  list.classList.toggle('corrections-expanded');
+  const expanded = list.classList.toggle('corrections-expanded');
+  const header = document.querySelector('.corrections-compact-header');
+  if (header) header.setAttribute('aria-expanded', String(expanded));
 }
 window.toggleCorrections = toggleCorrections;
 
@@ -1156,11 +1158,15 @@ function showCopied(label) {
 function toggleCopyMenu() {
   state.copyMenuOpen = !state.copyMenuOpen;
   $('copyDropdown').classList.toggle('show', state.copyMenuOpen);
+  const btn = document.querySelector('.btn-copy-menu');
+  if (btn) btn.setAttribute('aria-expanded', String(state.copyMenuOpen));
 }
 
 
 function toggleCmdPanel() {
-  $('cmdPanel').classList.toggle('open');
+  const panel = $('cmdPanel');
+  const open = panel.classList.toggle('open');
+  if (open) panel.focus();
 }
 
 // ══════════════════════════════════════════
@@ -1627,7 +1633,7 @@ function showServerSetup() {
           <div>git clone https://github.com/Fiavaion/dictate.git</div>
           <div>cd dictate</div>
           <div style="margin-top:8px">python server.py</div>
-          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:3000</div>
+          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:31000</div>
         </div>
         <p style="font-family:var(--body);font-size:0.72rem;color:var(--muted);line-height:1.5">
           For AI features, also install <a href="https://ollama.com" target="_blank" style="color:var(--ai-glow)">Ollama</a> and pull a model:<br>

@@ -32,6 +32,7 @@ export class FormatCardsModal {
     // Build and attach the modal DOM
     this._el = this._createOverlay();
     document.body.appendChild(this._el);
+    this._el.querySelector('.fmt-close')?.focus();
 
     // Wire formatter callbacks
     this._formatter.onFormatStart = (fmt) => {
@@ -88,13 +89,16 @@ export class FormatCardsModal {
 
     const modal = document.createElement('div');
     modal.className = 'folder-modal fmt-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'fmtTitle');
 
     // Header
     const header = document.createElement('div');
     header.className = 'folder-modal-header';
     header.innerHTML = `
-      <span class="folder-modal-title">FORMAT FOR...</span>
-      <button class="folder-modal-close fmt-close">&times;</button>
+      <span class="folder-modal-title" id="fmtTitle">FORMAT FOR...</span>
+      <button class="folder-modal-close fmt-close" aria-label="Close">&times;</button>
     `;
     header.querySelector('.fmt-close').addEventListener('click', () => this.close());
 
