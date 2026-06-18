@@ -21,6 +21,7 @@ export class ConfidenceHeatmap {
     /** Callback fired when user picks an alternative: (segmentIdx, newWord) => void */
     this.onWordOverride = null;
     this._stylesInjected = false;
+    this._clickContainer = null;
   }
 
   /**
@@ -39,6 +40,10 @@ export class ConfidenceHeatmap {
       startIdx: currentLen,
       endIdx: currentLen + text.length,
     });
+    // Bound memory for very long sessions; the full transcript lives in
+    // state.rawTranscript, so capping only trims the heatmap overlay.
+    const MAX_SEGMENTS = 1000;
+    if (this.segments.length > MAX_SEGMENTS) this.segments.shift();
   }
 
   /**
@@ -71,7 +76,10 @@ export class ConfidenceHeatmap {
    * @param {HTMLElement} container — the element holding the rendered spans
    */
   attachClickHandlers(container) {
-    if (!container) return;
+    if (!container || this._clickContainer === container) return;
+    // Delegated listener survives innerHTML rebuilds, so bind it only once
+    // per container instead of on every renderTranscript() call.
+    this._clickContainer = container;
 
     container.addEventListener('click', (e) => {
       const wordEl = e.target.closest('.confidence-clickable');

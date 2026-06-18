@@ -557,19 +557,30 @@ function resizeCanvas() { canvas.width = innerWidth; canvas.height = innerHeight
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
+let waveRafId = null;
+let _waveColors = null;
+
+// CSS custom-property colours are static for the session — read them once.
+function _waveColor(isAI) {
+  if (!_waveColors) {
+    const cs = getComputedStyle(document.body);
+    _waveColors = {
+      ai: cs.getPropertyValue('--ai-glow').trim() || '#7b6ef6',
+      accent: cs.getPropertyValue('--accent').trim() || '#b8ff57',
+    };
+  }
+  return isAI ? _waveColors.ai : _waveColors.accent;
+}
+
 function drawWave() {
-  requestAnimationFrame(drawWave);
   ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-  if (!analyser) return;
+  // Only run the 60fps loop while recording; idle bars are reset by stopRecording().
+  if (!analyser || !state.isRecording) { waveRafId = null; return; }
   analyser.getFloatTimeDomainData(waveData);
   ctx2d.beginPath();
 
-  // Shift color when AI is processing
   const isAI = correctionPipeline.isActive || promptStructurer.isActive;
-  const accentColor = isAI
-    ? getComputedStyle(document.body).getPropertyValue('--ai-glow').trim() || '#7b6ef6'
-    : getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#b8ff57';
-  ctx2d.strokeStyle = accentColor;
+  ctx2d.strokeStyle = _waveColor(isAI);
   ctx2d.lineWidth = 1.5;
 
   const sw = canvas.width / waveData.length;
@@ -585,13 +596,15 @@ function drawWave() {
   vuBars.forEach((b, i) => {
     const val = freq[i * step] / 255;
     b.style.height = Math.max(3, val * 28) + 'px';
-    if (state.isRecording) {
-      const hue = isAI ? 250 + val * 30 : 74 + val * 40;
-      b.style.background = `hsl(${hue}, 100%, ${45 + val * 20}%)`;
-    } else {
-      b.style.background = 'var(--border)';
-    }
+    const hue = isAI ? 250 + val * 30 : 74 + val * 40;
+    b.style.background = `hsl(${hue}, 100%, ${45 + val * 20}%)`;
   });
+
+  waveRafId = requestAnimationFrame(drawWave);
+}
+
+function startWave() {
+  if (waveRafId == null) waveRafId = requestAnimationFrame(drawWave);
 }
 
 async function startAudio() {
@@ -622,6 +635,7 @@ async function startRecording() {
   sttEngine.start(vocab.allHints);
 
   state.isRecording = true;
+  startWave();
   $('btnMic').classList.add('recording');
   $('btnLabel').textContent = 'STOP';
 
@@ -634,6 +648,7 @@ async function startRecording() {
 function stopRecording() {
   state.isRecording = false;
   sttEngine.stop();
+  ambientDetector.stop();
   $('btnMic').classList.remove('recording');
   $('btnLabel').textContent = 'START';
   clearInterval(state.sessionTimer);
@@ -2260,6 +2275,8 @@ function toggleTypoControls(pane) {
   }
 }
 
+let _typoSaveTimer = null;
+
 function updateTypo(slider) {
   const { pane, prop } = slider.dataset;
   const el = TYPO_TARGETS[pane]();
@@ -2270,16 +2287,21 @@ function updateTypo(slider) {
   if (prop === 'fontSize') {
     el.style.fontSize = `${v}px`;
     $(`typoVal${suffix}Size`).textContent = v;
+    slider.setAttribute('aria-valuetext', `${v} pixels`);
   } else if (prop === 'letterSpacing') {
     const em = v / 1000;
     el.style.letterSpacing = `${em}em`;
     $(`typoVal${suffix}Tracking`).textContent = em.toFixed(2);
+    slider.setAttribute('aria-valuetext', `${em.toFixed(2)} em tracking`);
   } else if (prop === 'lineHeight') {
     const lh = v / 100;
     el.style.lineHeight = lh;
     $(`typoVal${suffix}Leading`).textContent = lh.toFixed(2);
+    slider.setAttribute('aria-valuetext', `${lh.toFixed(2)} line height`);
   }
-  saveTypoSettings();
+  // Debounce persistence — oninput fires rapidly during a drag.
+  clearTimeout(_typoSaveTimer);
+  _typoSaveTimer = setTimeout(saveTypoSettings, 250);
 }
 
 function saveTypoSettings() {

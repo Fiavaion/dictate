@@ -225,7 +225,6 @@ function _relaySSE(provider, upstream, res) {
         let text = '';
         if (provider === 'anthropic') {
           if (event.type === 'content_block_delta') text = event.delta?.text || '';
-          else if (event.type === 'message_stop') { break; }
         } else if (provider === 'openai') {
           text = event.choices?.[0]?.delta?.content || '';
         }
