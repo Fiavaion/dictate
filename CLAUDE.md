@@ -52,7 +52,8 @@ GitHub Pages static mode.
 
 # Coding Guidelines (LLM-aware)
 - Karpathy core: Think before coding · Simplicity first · Surgical changes · Goal-driven execution
-- **Reviewer mode** — after writing code, re-read your diff as a senior reviewer who intends to reject it (bugs, over-engineering, scope creep, AI-slop); fix what you find, THEN declare done
+- **Minimalism ladder — before writing code, walk it in order:** (1) does this need to exist? — if not, skip it (YAGNI); (2) does the browser/Web platform or Python stdlib do it? (3) a feature of an already-loaded dep (Electron / a configured provider client)? (4) only then a new dependency — "vanilla JS, no build step" and "Python stdlib server (no Flask)" are deliberate, so propose first; (5) can it be a few lines? (6) then the minimum that works. Never cut validation, error handling, or graceful provider/offline fallback to be "minimal."
+- **Reviewer mode** — after writing code, re-read your diff as a senior reviewer who intends to reject it (bugs, over-engineering, scope creep, AI-slop); fix what you find, THEN declare done. For risky or fan-out changes, escalate to a **fresh-context verifier sub-agent** that grades the diff against the acceptance criteria — a separate context beats self-review
 - ES modules (import/export) throughout js/ — no CommonJS require() in browser code
 - Keep JS files focused; one responsibility per module
 - No TypeScript, no build step — vanilla JS runs directly in browser/Electron
@@ -69,6 +70,8 @@ GitHub Pages static mode.
 - Green tests ≠ done. Tests can pass while the feature is broken.
 - For UI: drive it in the browser. For server: hit the endpoint. For Electron: launch the app.
 - Never build feature N+1 on a foundation feature N that hasn't been verified working.
+- **Acceptance criteria up front** — before building anything non-trivial, write the *checkable* criteria that define done (e.g. "AI correction returns polished text < 30s from open") and fix them before, not after — so the loop has a real gate.
+- **Grounded progress** — before reporting progress, audit each claim against a browser / endpoint / Electron result from this session; if it isn't verified, say so.
 
 # Change Boundaries
 **Never edit without explicit approval:**
@@ -91,6 +94,11 @@ Decisions already made (pending ADR write-up):
 - Web Speech API (Chrome/Electron only — not cross-browser)
 - Python stdlib server (no Flask/FastAPI)
 - Electron for desktop (not Tauri, not NW.js)
+
+# Scope & Dependencies
+- Build the in-scope must-haves first (the Success-Metric path); everything else is deferred, not "maybe."
+- Add a dependency only when an in-scope feature needs it now — "vanilla JS / no build step" and "Python stdlib server" are deliberate; a new dep is a decision to propose, not assume.
+- Anything user-facing: validate the UI (sketch / dummy data) before building the backend behind it.
 
 # Model Selection Policy
 **`modelswitcher` is the authoritative rubric** — consult it before any multi-agent fan-out.
