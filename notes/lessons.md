@@ -36,3 +36,17 @@ in Pages mode). The Gemini API must be called directly from the browser.
 **Prevention:** Always verify which code path runs in GitHub Pages mode vs server mode.
 The server proxy pattern breaks in static hosting.  
 **Location:** js/ai/ai-client.js   **Impact:** medium (blocked cloud AI on Pages)
+
+---
+
+#### LESSON-TEST-001: a commit message claimed a fix the edit didn't make
+**Problem:** Commit 1's message said it HTML-escaped "the API key", but the edit only
+escaped the model-name/option fields — the actual `value="${apiKey}"` line was never
+touched. The self-XSS gap shipped into the commit unnoticed.  
+**Root cause:** Declared "done" from intent (what I meant to edit) rather than from the
+diff (what actually changed). Multiple similar edits in one batch masked the miss.  
+**Fix:** The `/release` re-scan over the accumulated diff caught it; fixed in `c487aee`.  
+**Prevention:** Grade every claimed fix against the real diff before declaring done — for
+audits, a fresh-context verifier over the diff beats self-review (now in CLAUDE.md
+"Grounded progress" + "Reviewer mode → fresh-context verifier").  
+**Location:** js/ui/api-settings.js   **Impact:** medium (caught pre-merge by the gate)

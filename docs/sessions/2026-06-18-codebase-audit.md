@@ -34,9 +34,29 @@ port migration (3000→31000, to avoid an Open WebUI conflict) and ADR write-up.
 - In-browser core workflow (dictate → AI-correct → copy). No headless browser console
   available this session; recommend a manual spot-check before merging to master.
 
+## Release gate — PASS
+Ran `/release` (interactive) after the audit. Stages 0–5 with parallel Sonnet review
+subagents over the audit diff, synthesis + verdict on Opus.
+- Stage 0 smoke PASS; Stage 5 re-test PASS.
+- The re-scan caught **2 HIGH** the audit had missed/left: api-settings.js API-key value
+  was still unescaped (commit 1's message claimed to fix it but the edit missed that exact
+  line), and gemini-wizard step-4 `<option>`s were unescaped (now fed by live discovery).
+  Plus 1 MEDIUM: Electron model-list functions returned `[]` on a bad-key 4xx. All fixed
+  in commit `c487aee`, re-tested.
+- Verdict: PASS — tests green before/after, zero unresolved CRITICAL/HIGH.
+- Browser core path: user-confirmed working.
+
+Branch state: 11 commits + restore tag `audit-checkpoint-2026-06-18`. Bootstrap infra
+(docs/, evals/, notes/, .claude config) committed; `.claude/worktrees/` + settings.local
+added to .gitignore (user-approved). `.claude/settings.json` left untracked pending the
+exec-form hook paste.
+
+## Lessons captured
+- LESSON: a commit message claimed an escaping fix that the actual edit missed; the
+  `/release` diff re-scan caught it. Always grade each claimed fix against the real diff
+  before declaring done (now encoded in CLAUDE.md "Grounded progress"). See notes/lessons.md.
+
 ## Next steps
-1. Manual browser verify of the core path on :31000.
-2. Finish/drop the server auto-start hook (TD-001).
-3. `/release` gate, then merge the audit branch to master.
-4. Decide whether to commit the untracked bootstrap infra (.claude/, notes/, docs/, evals/)
-   and whether to add `.claude/worktrees/` to .gitignore (Change Boundary — needs approval).
+1. Paste the exec-form SessionStart hook into `.claude/settings.json` (closes TD-001), then commit it.
+2. Merge `audit/codebase-2026-06-18` → master (gate PASS) and tag a release.
+3. Bump local Node to ≥22 before cutting a `dist:win` installer (electron-builder 26).

@@ -1,8 +1,8 @@
 # Current Status
 
 **Last updated:** 2026-06-18
-**Phase / focus:** Full codebase audit complete — fixes applied on `audit/codebase-2026-06-18`
-**Build:** ✅ server.py runs on :31000 · Electron 42 app launches · **Tests:** smoke PASS
+**Phase / focus:** Full codebase audit complete + `/release` gate PASS on `audit/codebase-2026-06-18`
+**Build:** ✅ server.py runs on :31000 · Electron 42 app launches · **Tests:** smoke PASS · **Release gate: PASS**
 
 ## What works right now
 - [x] Web Speech API dictation (Chrome/Edge/Electron)
@@ -24,14 +24,14 @@
 7. `4c42cf5` Electron 34→42, electron-builder 25→26, express 4.22.2 — **npm audit: 0 vulnerabilities**
 
 ## What's broken / known issues
-- Server does not auto-start (TD-001 — SessionStart hook unfinished; exec-form correction unsaved)
+- Server does not auto-start (TD-001 — SessionStart hook unfinished; exec-form correction unsaved in .claude/settings.json)
 - Packaging (`dist:win`) prefers Node ≥22.12 (electron-builder 26 dep); local Node is 20. Running the app is unaffected.
-- In-browser core workflow (dictate→correct→copy) not yet manually re-verified after the audit edits.
+- In-browser core workflow: ✅ user-confirmed working this session.
 
 ## Next 3 tasks (in order)
-1. Manually verify the browser core path (open app on :31000, dictate, AI-correct, copy) — confirm no JS regressions from the audit edits
-2. Finish or drop the server auto-start hook (TD-001) — paste exec-form into `.claude/settings.json` or remove it
-3. Merge `audit/codebase-2026-06-18` to master after `/release` gate
+1. Paste the exec-form SessionStart hook into `.claude/settings.json` (closes TD-001), then commit it — the only uncommitted file
+2. Merge `audit/codebase-2026-06-18` → master (release gate already PASS) and tag a release
+3. Bump local Node to ≥22 before cutting a `dist:win` installer (electron-builder 26 requirement)
 
 ## Blockers
 - None blocking. Browser manual-verify is the recommended next confidence step.
