@@ -6,6 +6,7 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "python evals/smoke-test.py",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist": "electron-builder --win --mac"
@@ -36,7 +37,7 @@
       "target": [
         { "target": "dmg", "arch": ["x64", "arm64"] }
       ],
-      "icon": "build/icon.icns",
+      "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "darkModeSupport": true
     },
@@ -51,10 +52,14 @@
     }
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.22.2"
   },
   "devDependencies": {
-    "electron": "^34.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
