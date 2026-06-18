@@ -210,7 +210,7 @@ export class GeminiWizard {
     ];
     const selected = this.client.getSelectedModel('google');
     const opts = models.map(m =>
-      `<option value="${m.name}"${m.name === selected ? ' selected' : ''}>${m.label || m.name}</option>`
+      `<option value="${gwEsc(m.name)}"${m.name === selected ? ' selected' : ''}>${gwEsc(m.label || m.name)}</option>`
     ).join('');
 
     body.innerHTML = `

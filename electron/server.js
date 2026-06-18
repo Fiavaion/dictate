@@ -380,8 +380,9 @@ async function _listAnthropicModels(apiKey) {
   const chunks = [];
   upstream.on('data', c => chunks.push(c));
   await new Promise(r => upstream.on('end', r));
-  const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  return data.data || [];
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (upstream.statusCode >= 400) throw new Error(`Anthropic models HTTP ${upstream.statusCode}: ${raw.slice(0, 200)}`);
+  return JSON.parse(raw).data || [];
 }
 
 async function _listGoogleModels(apiKey) {
@@ -394,8 +395,9 @@ async function _listGoogleModels(apiKey) {
   const chunks = [];
   upstream.on('data', c => chunks.push(c));
   await new Promise(r => upstream.on('end', r));
-  const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  return data.models || [];
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (upstream.statusCode >= 400) throw new Error(`Google models HTTP ${upstream.statusCode}: ${raw.slice(0, 200)}`);
+  return JSON.parse(raw).models || [];
 }
 
 // ---------------------------------------------------------------------------

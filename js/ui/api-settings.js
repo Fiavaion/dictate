@@ -110,7 +110,7 @@ export class APISettingsModal {
       body.innerHTML = `
         <label class="ai-settings-label">API Key</label>
         <div class="ai-settings-key-row">
-          <input class="ai-settings-input" id="aiSettingsApiKey" type="password" value="${hasKey ? apiKey : ''}" placeholder="Enter API key" style="flex:1">
+          <input class="ai-settings-input" id="aiSettingsApiKey" type="password" value="${hasKey ? this._escHtml(apiKey) : ''}" placeholder="Enter API key" style="flex:1">
           <button class="ai-settings-eye" id="aiSettingsEyeBtn" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
