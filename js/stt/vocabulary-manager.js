@@ -2,6 +2,8 @@
  * Developer Vocabulary Manager — expanded for Claude Code prompt engineering
  */
 
+import { readJSON, writeJSON } from '../utils/persistence.js';
+
 const DEV_PRESET = [
   // JS/TS errors & concepts
   'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError',
@@ -60,11 +62,10 @@ export class VocabularyManager {
   get customTerms() { return [...this._custom]; }
 
   _load() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
+    return readJSON(STORAGE_KEY, []);
   }
 
   _save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this._custom));
+    writeJSON(STORAGE_KEY, this._custom);
   }
 }

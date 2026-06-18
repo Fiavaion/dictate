@@ -15,7 +15,8 @@ import { APISettingsModal } from './ui/api-settings.js';
 import { copyToClipboard } from './utils/clipboard.js';
 import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
   loadSessionsIndex, saveSessionToList, loadSavedSession, deleteSessionFromList,
-  renameSession, exportSessions, importSessions } from './utils/persistence.js';
+  renameSession, exportSessions, importSessions,
+  readJSON, writeJSON } from './utils/persistence.js';
 import { fetchProjects, sortByModified, sortByName, saveProjectSettings, loadProjectSettings } from './utils/projects.js';
 import { PromptBuilder } from './ui/prompt-builder.js';
 import { AmbientDetector } from './stt/ambient-detector.js';
@@ -2313,14 +2314,13 @@ function saveTypoSettings() {
     data[pane] = {};
     sliders.forEach(s => { data[pane][s.dataset.prop] = Number(s.value); });
   }
-  localStorage.setItem('dictate_typo', JSON.stringify(data));
+  writeJSON('dictate_typo', data);
 }
 
 function loadTypoSettings() {
-  const raw = localStorage.getItem('dictate_typo');
-  if (!raw) return;
+  const data = readJSON('dictate_typo', null);
+  if (!data) return;
   try {
-    const data = JSON.parse(raw);
     for (const pane of ['raw', 'refined']) {
       if (!data[pane]) continue;
       const suffix = pane === 'raw' ? 'Raw' : 'Refined';

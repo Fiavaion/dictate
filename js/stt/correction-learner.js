@@ -11,6 +11,8 @@
  *   for (const diff of diffs) learner.observeDiff(diff);
  */
 
+import { readJSON, writeJSON } from '../utils/persistence.js';
+
 const STORAGE_KEY = 'fiavaion-correction-learner';
 
 export class CorrectionLearner {
@@ -319,22 +321,12 @@ export class CorrectionLearner {
 
   /** Save corrections to localStorage */
   _save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.corrections));
-    } catch {
-      /* localStorage full — degrade gracefully */
-    }
+    writeJSON(STORAGE_KEY, this.corrections);
   }
 
   /** Load corrections from localStorage */
   _load() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        this.corrections = JSON.parse(data);
-      }
-    } catch {
-      this.corrections = {};
-    }
+    const data = readJSON(STORAGE_KEY, null);
+    if (data && typeof data === 'object') this.corrections = data;
   }
 }

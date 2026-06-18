@@ -10,6 +10,8 @@
  * Persists to localStorage under STORAGE_KEY.
  */
 
+import { readJSON, writeJSON } from '../utils/persistence.js';
+
 const STORAGE_KEY = 'fiavaion-custom-commands';
 const STEP_DELAY = 80; // ms between step execution
 
@@ -249,21 +251,13 @@ export class CommandComposer {
 
   /** @private */
   _save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.commands));
-    } catch { /* storage full -- degrade gracefully */ }
+    writeJSON(STORAGE_KEY, this.commands);
   }
 
   /** @private */
   _load() {
-    try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (data && typeof data === 'object') {
-        this.commands = data;
-      }
-    } catch {
-      this.commands = {};
-    }
+    const data = readJSON(STORAGE_KEY, null);
+    if (data && typeof data === 'object') this.commands = data;
   }
 }
 

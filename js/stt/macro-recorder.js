@@ -5,6 +5,8 @@
  * Persists to localStorage under STORAGE_KEY.
  */
 
+import { readJSON, writeJSON } from '../utils/persistence.js';
+
 const STORAGE_KEY = 'fiavaion-macros';
 const REPLAY_STEP_DELAY = 100; // ms between replayed steps
 
@@ -209,21 +211,13 @@ export class MacroRecorder {
 
   /** @private */
   _save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.macros));
-    } catch { /* storage full -- degrade gracefully */ }
+    writeJSON(STORAGE_KEY, this.macros);
   }
 
   /** @private */
   _load() {
-    try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (data && typeof data === 'object') {
-        this.macros = data;
-      }
-    } catch {
-      this.macros = {};
-    }
+    const data = readJSON(STORAGE_KEY, null);
+    if (data && typeof data === 'object') this.macros = data;
   }
 }
 

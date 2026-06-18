@@ -3,6 +3,8 @@
  * Fetches local project list from server.py and manages per-project settings.
  */
 
+import { readJSON, writeJSON } from './persistence.js';
+
 const PROJECT_SETTINGS_PREFIX = 'fiavaion-project-';
 
 /**
@@ -41,11 +43,8 @@ export function sortByName(projects) {
  * @param {object} settings - { stack, correctionModel, template }
  */
 export function saveProjectSettings(name, settings) {
-  try {
-    const key = PROJECT_SETTINGS_PREFIX + name;
-    const existing = loadProjectSettings(name);
-    localStorage.setItem(key, JSON.stringify({ ...existing, ...settings }));
-  } catch { /* storage full */ }
+  const existing = loadProjectSettings(name);
+  writeJSON(PROJECT_SETTINGS_PREFIX + name, { ...existing, ...settings });
 }
 
 /**
@@ -55,7 +54,7 @@ export function saveProjectSettings(name, settings) {
  */
 export function loadProjectSettings(name) {
   try {
-    return JSON.parse(localStorage.getItem(PROJECT_SETTINGS_PREFIX + name) || '{}');
+    return readJSON(PROJECT_SETTINGS_PREFIX + name, {});
   } catch {
     return {};
   }

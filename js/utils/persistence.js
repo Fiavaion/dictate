@@ -1,6 +1,39 @@
 /**
- * Session Persistence — auto-save/restore via localStorage
+ * Session Persistence — auto-save/restore via localStorage.
+ *
+ * This module is the single place that touches the localStorage API. Other
+ * modules MUST persist through the generic helpers below (readJSON/writeJSON/
+ * readRaw/writeRaw/removeKey) rather than calling localStorage directly.
  */
+
+// ── Generic typed storage helpers ────────────────────────────────────────
+// Each degrades gracefully (storage full / disabled / corrupt) — never throws.
+
+export function readJSON(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch { return fallback; }
+}
+
+export function writeJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch { return false; }
+}
+
+export function readRaw(key, fallback = null) {
+  try { const v = localStorage.getItem(key); return v == null ? fallback : v; }
+  catch { return fallback; }
+}
+
+export function writeRaw(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch { return false; }
+}
+
+export function removeKey(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
 
 const SESSION_KEY = 'fiavaion-dictate-session';
 const SETTINGS_KEY = 'fiavaion-dictate-settings';

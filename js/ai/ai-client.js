@@ -5,6 +5,7 @@
  */
 
 import { OllamaClient } from './ollama-client.js';
+import { readRaw, writeRaw, removeKey } from '../utils/persistence.js';
 
 // Anthropic model families — used to group and label discovered models
 const ANTHROPIC_FAMILIES = ['haiku', 'sonnet', 'opus'];
@@ -127,7 +128,7 @@ async function decryptKey(stored) {
 export class AIClient {
   constructor() {
     this._ollamaClient = new OllamaClient();
-    this._provider = localStorage.getItem(STORAGE_PROVIDER) || 'ollama';
+    this._provider = readRaw(STORAGE_PROVIDER, 'ollama');
     this._connected = false;
     this._checkInterval = null;
     this._providerModels = {};
@@ -144,7 +145,7 @@ export class AIClient {
   async _initKeys() {
     const providers = Object.keys(PROVIDERS).filter(k => !PROVIDERS[k].local);
     for (const p of providers) {
-      const stored = localStorage.getItem(STORAGE_KEY_PREFIX + p);
+      const stored = readRaw(STORAGE_KEY_PREFIX + p);
       if (!stored) continue;
       const plain = await decryptKey(stored);
       if (plain) {
@@ -152,7 +153,7 @@ export class AIClient {
         // Re-encrypt legacy base64 values with AES-GCM
         if (!stored.startsWith('enc1:')) {
           const encrypted = await encryptKey(plain);
-          if (encrypted) localStorage.setItem(STORAGE_KEY_PREFIX + p, encrypted);
+          if (encrypted) writeRaw(STORAGE_KEY_PREFIX + p, encrypted);
         }
       }
     }
@@ -238,25 +239,25 @@ export class AIClient {
 
   getSelectedModel(provider) {
     const p = provider || this._provider;
-    const stored = localStorage.getItem(STORAGE_MODEL_PREFIX + p);
+    const stored = readRaw(STORAGE_MODEL_PREFIX + p);
     // Validate stored model still exists in our list; if not, use default
     if (stored) {
       const known = this._providerModels[p] || [];
       if (known.length === 0 || known.some(m => m.name === stored)) return stored;
       // Stale model ID — clear it
-      localStorage.removeItem(STORAGE_MODEL_PREFIX + p);
+      removeKey(STORAGE_MODEL_PREFIX + p);
     }
     return this.getDefaultModel(p);
   }
 
   setSelectedModel(provider, model) {
-    localStorage.setItem(STORAGE_MODEL_PREFIX + (provider || this._provider), model);
+    writeRaw(STORAGE_MODEL_PREFIX + (provider || this._provider), model);
   }
 
   setProvider(name, config = {}) {
     if (!PROVIDERS[name]) return;
     this._provider = name;
-    localStorage.setItem(STORAGE_PROVIDER, name);
+    writeRaw(STORAGE_PROVIDER, name);
 
     if (name === 'ollama' && config.baseUrl) {
       this._ollamaClient = new OllamaClient(config.baseUrl);
@@ -279,7 +280,7 @@ export class AIClient {
     this._keyCache[provider] = key;
     if (remember) {
       encryptKey(key).then(enc => {
-        if (enc) localStorage.setItem(STORAGE_KEY_PREFIX + provider, enc);
+        if (enc) writeRaw(STORAGE_KEY_PREFIX + provider, enc);
       });
     }
   }
@@ -290,7 +291,7 @@ export class AIClient {
 
   clearApiKey(provider) {
     delete this._keyCache[provider];
-    localStorage.removeItem(STORAGE_KEY_PREFIX + provider);
+    removeKey(STORAGE_KEY_PREFIX + provider);
   }
 
   // -------------------------------------------------------------------------

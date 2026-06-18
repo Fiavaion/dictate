@@ -3,6 +3,8 @@
  * Writing mode presets that control tone, style, and output format.
  */
 
+import { readJSON, writeJSON } from '../utils/persistence.js';
+
 export const TEMPLATES = {
   freeform: {
     label: 'Free Form',
@@ -188,15 +190,14 @@ const CUSTOM_STORAGE_KEY = 'fiavaion-dictate-templates';
 
 /** Load custom templates from localStorage */
 export function loadCustomTemplates() {
-  try { return JSON.parse(localStorage.getItem(CUSTOM_STORAGE_KEY) || '{}'); }
-  catch { return {}; }
+  return readJSON(CUSTOM_STORAGE_KEY, {});
 }
 
 /** Save a custom template */
 export function saveCustomTemplate(key, template) {
   const custom = loadCustomTemplates();
   custom[key] = template;
-  localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(custom));
+  writeJSON(CUSTOM_STORAGE_KEY, custom);
 }
 
 /** Get all templates (built-in + custom) */
