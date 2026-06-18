@@ -46,7 +46,8 @@ async function createWindow() {
   mainWindow.loadURL(`http://localhost:${PORT}`);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Only hand http(s) URLs to the OS shell; deny file:, data:, etc.
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
 

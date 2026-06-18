@@ -86,7 +86,7 @@ export class APISettingsModal {
       const baseUrl = this.client.getOllamaBaseUrl();
       const models = this.client.models;
       const modelList = models.length > 0
-        ? models.map(m => `<div class="ai-settings-model-item">${m.name}${m.size ? ` <span style="color:var(--dim)">${m.size}</span>` : ''}</div>`).join('')
+        ? models.map(m => `<div class="ai-settings-model-item">${this._escHtml(m.name)}${m.size ? ` <span style="color:var(--dim)">${this._escHtml(m.size)}</span>` : ''}</div>`).join('')
         : '<div style="color:var(--dim);font-size:0.75rem">No models found. Is Ollama running?</div>';
 
       body.innerHTML = `
@@ -103,7 +103,7 @@ export class APISettingsModal {
       const selectedModel = this.client.getSelectedModel(provider);
 
       const optionsHtml = models.map(m =>
-        `<option value="${m.name}"${m.name === selectedModel ? ' selected' : ''}>${m.label || m.name}</option>`
+        `<option value="${this._escHtml(m.name)}"${m.name === selectedModel ? ' selected' : ''}>${this._escHtml(m.label || m.name)}</option>`
       ).join('');
 
       body.innerHTML = `

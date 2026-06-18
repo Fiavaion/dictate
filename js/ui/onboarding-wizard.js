@@ -8,6 +8,10 @@
  */
 
 const OLLAMA_URL = 'http://localhost:11434';
+
+const escHtml = (str) => String(str)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const RECOMMENDED_MODELS = [
   { name: 'gemma3:4b',          label: 'Gemma 3 4B',         size: '3 GB',  speed: 'Fast — recommended',   default: true },
   { name: 'llama3.2:3b',        label: 'Llama 3.2 3B',       size: '2 GB',  speed: 'Lightest option' },
@@ -612,7 +616,7 @@ export class OnboardingWizard {
       </a>
       <div class="ow-field" style="margin-top:16px">
         <div class="gw-key-row">
-          <input class="ai-settings-input" id="owApiKey" type="password" value="${existing}" placeholder="${p.keyPlaceholder}" style="flex:1">
+          <input class="ai-settings-input" id="owApiKey" type="password" value="${escHtml(existing)}" placeholder="${p.keyPlaceholder}" style="flex:1">
           <button class="ai-settings-eye" id="owEye" title="Show/hide key">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>

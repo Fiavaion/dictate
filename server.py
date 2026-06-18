@@ -29,7 +29,7 @@ def _check_rate_limit(ip: str) -> bool:
 
 DEFAULT_PROJECTS_ROOT = str(pathlib.Path.home() / "AIprojects")
 CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
-PORT = 3000
+PORT = 31000
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,13 @@ def get_projects():
 
 def scan_project(project_name):
     """Walk project directory (max depth 4), return file list and stack info."""
-    root = get_projects_root() / project_name
+    projects_root = get_projects_root()
+    root = projects_root / project_name
+    # Containment check: reject names like '../secret' that escape the projects root.
+    try:
+        root.resolve().relative_to(projects_root.resolve())
+    except ValueError:
+        return {"name": project_name, "stack": "", "files": []}
     if not root.is_dir():
         return {"name": project_name, "stack": "", "files": []}
 
@@ -367,15 +373,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     _ALLOWED_ORIGINS = {
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "http://localhost:31000",
+        "http://127.0.0.1:31000",
         "https://fiavaion.github.io",
     }
 
     def _cors_headers(self):
         """Add CORS headers — restrict to known origins only."""
         origin = self.headers.get("Origin", "")
-        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:3000"
+        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:31000"
         self.send_header("Access-Control-Allow-Origin", allowed)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")

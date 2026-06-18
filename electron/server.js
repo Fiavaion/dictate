@@ -403,6 +403,14 @@ function _buildApp(staticRoot) {
     next();
   });
 
+  // Security headers (mirrors server.py _security_headers)
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   // --- System check ---
   app.get('/api/system/check', (req, res) => {
     res.json({ server: true, node: process.version });
