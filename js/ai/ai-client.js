@@ -48,7 +48,6 @@ const PROVIDERS = {
       { name: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
       { name: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
       { name: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { name: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)' },
     ],
     local: false,
   },
@@ -157,8 +156,9 @@ export class AIClient {
         }
       }
     }
-    // Discover latest Anthropic models in the background if a key exists
+    // Discover latest models in the background if a key exists
     if (this._keyCache.anthropic) this.fetchLatestModels();
+    if (this._keyCache.google) this.fetchLatestGeminiModels();
   }
 
   /**
@@ -196,6 +196,44 @@ export class AIClient {
 
       if (discovered.length > 0) {
         this._providerModels.anthropic = discovered;
+        return true;
+      }
+    } catch { /* network error or GitHub Pages — fall back silently */ }
+    return false;
+  }
+
+  /**
+   * Query Google's Generative Language /models API via the local proxy and
+   * replace the Google model list with the live generateContent-capable
+   * Gemini models. Falls back to the static list on any error.
+   * Returns true if discovery succeeded.
+   */
+  async fetchLatestGeminiModels() {
+    const apiKey = this.getApiKey('google');
+    if (!apiKey) return false;
+    try {
+      const res = await fetch(MODELS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'google', apiKey }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return false;
+      const { models } = await res.json();
+      if (!Array.isArray(models) || models.length === 0) return false;
+
+      const discovered = models
+        .filter(m => (m.name || '').includes('gemini-')
+          && Array.isArray(m.supportedGenerationMethods)
+          && m.supportedGenerationMethods.includes('generateContent'))
+        .map(m => {
+          const name = m.name.replace(/^models\//, '');
+          return { name, label: m.displayName || name };
+        })
+        .sort((a, b) => b.name.localeCompare(a.name));
+
+      if (discovered.length > 0) {
+        this._providerModels.google = discovered;
         return true;
       }
     } catch { /* network error or GitHub Pages — fall back silently */ }

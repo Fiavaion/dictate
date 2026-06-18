@@ -191,6 +191,7 @@ export class GeminiWizard {
       // Rate-limited means the key IS valid — just temporarily throttled
       const msg = isRateLimit ? 'Key valid! (rate-limited — will work shortly)' : 'Connected!';
       this._showStatus(msg, 'var(--success)');
+      this.client.fetchLatestGeminiModels();  // background — populates step 4's list
       setTimeout(() => this._goTo(4), 800);
     } else {
       this.client.setProvider(prevProvider);
@@ -206,7 +207,6 @@ export class GeminiWizard {
       { name: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
       { name: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
       { name: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { name: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)' },
     ];
     const selected = this.client.getSelectedModel('google');
     const opts = models.map(m =>

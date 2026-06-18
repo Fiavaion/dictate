@@ -245,6 +245,16 @@ def _list_anthropic_models(api_key):
     return data.get("data", [])
 
 
+def _list_google_models(api_key):
+    """Fetch available models from the Google Generative Language API (GET)."""
+    url = ("https://generativelanguage.googleapis.com/v1beta/models?key="
+           + urllib.parse.quote(api_key, safe=""))
+    req = urllib.request.Request(url)
+    resp = urllib.request.urlopen(req, context=_SSL_CTX, timeout=10)
+    data = json.loads(resp.read().decode("utf-8"))
+    return data.get("models", [])
+
+
 def _call_anthropic(api_key, model, prompt, system_prompt, stream, options):
     """Call Anthropic Messages API. Returns (response_obj, provider_name)."""
     body = json.dumps({
@@ -505,6 +515,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             if provider == "anthropic":
                 models = _list_anthropic_models(api_key)
+                self._json_ok({"models": models})
+            elif provider == "google":
+                models = _list_google_models(api_key)
                 self._json_ok({"models": models})
             else:
                 self._json_error(400, f"Model listing not supported for: {provider}")

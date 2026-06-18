@@ -384,6 +384,20 @@ async function _listAnthropicModels(apiKey) {
   return data.data || [];
 }
 
+async function _listGoogleModels(apiKey) {
+  const upstream = await _httpsRequest({
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    method: 'GET',
+    headers: {},
+  }, '');
+  const chunks = [];
+  upstream.on('data', c => chunks.push(c));
+  await new Promise(r => upstream.on('end', r));
+  const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return data.models || [];
+}
+
 // ---------------------------------------------------------------------------
 // Express app
 // ---------------------------------------------------------------------------
@@ -473,6 +487,9 @@ function _buildApp(staticRoot) {
     try {
       if (provider === 'anthropic') {
         const models = await _listAnthropicModels(apiKey);
+        res.json({ models });
+      } else if (provider === 'google') {
+        const models = await _listGoogleModels(apiKey);
         res.json({ models });
       } else {
         res.status(400).json({ error: `Model listing not supported for: ${provider}` });
