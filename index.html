@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FiavaionDictate — AI-Powered Dictation for Claude Code</title>
+<!-- Apply saved theme before first paint (light is default) to avoid a flash -->
+<script>(function(){try{if(localStorage.getItem('dictate_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/ai-panel.css">
 <link rel="stylesheet" href="css/prompt-builder.css">
@@ -126,7 +128,7 @@
   <!-- HEADER -->
   <header>
     <div class="header-row-1">
-      <div class="logo" role="heading" aria-level="1">FIAVAION<span>.</span>DICTATE</div>
+      <div class="logo" role="heading" aria-level="1"><span class="logo-name">Fiavaion</span><span class="logo-sub">dictate</span></div>
       <div class="header-status">
         <div class="vu-meter" id="vuMeter"></div>
         <div class="status-pill" id="statusPill"><div class="dot"></div><span id="statusText">READY</span></div>
@@ -135,15 +137,19 @@
           <span class="ai-label">OFFLINE</span>
         </div>
         <button class="btn-gemini-wizard" id="btnSetupWizard" title="Run setup wizard" aria-label="Run setup wizard">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span class="wizard-btn-label">SETUP</span>
         </button>
         <button class="btn-gemini-wizard" id="btnGeminiWizard" title="Set up free Cloud AI (Gemini)" aria-label="Set up Gemini Cloud AI" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
           <span class="wizard-btn-label">GEMINI</span>
         </button>
+        <button class="btn-sort theme-toggle" id="btnThemeToggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" aria-pressed="false" onclick="toggleTheme()">
+          <svg aria-hidden="true" class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg aria-hidden="true" class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
         <button class="btn-sort" id="btnAISettings" title="AI Provider Settings" aria-label="AI Provider Settings" onclick="openAISettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
     </div>
@@ -155,24 +161,24 @@
         </select>
         <button class="btn-sort" id="btnSortProjects" title="Sort: Recent first" aria-label="Sort projects">&#9201;</button>
         <button class="btn-sort" id="btnSetFolder" title="Set projects folder" aria-label="Set projects folder">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </button>
       </div>
 
       <div class="session-selector" id="sessionSelectorWrap">
         <label for="sessionSearch" class="sr-only">Search sessions</label>
         <input class="session-search" id="sessionSearch" type="text" placeholder="Search sessions…">
-        <select class="ui-select" id="sessionSelect">
+        <select class="ui-select" id="sessionSelect" aria-label="Session">
           <option value="__new__">+ New Session</option>
         </select>
         <button class="btn-sort" id="btnDeleteSession" title="Delete session" aria-label="Delete session">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
         <button class="btn-sort" id="btnExportSessions" title="Export sessions" aria-label="Export sessions">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
         <button class="btn-sort" id="btnImportSessions" title="Import sessions" aria-label="Import sessions">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
       </div>
 
@@ -221,6 +227,12 @@
     <div class="pane-header">
       <div class="pane-label refined" id="refinedLabel">AI-CORRECTED OUTPUT</div>
       <div class="pane-actions">
+        <div class="processing-group" title="How the AI processes your dictation">
+          <span class="processing-label">PROCESS AS</span>
+          <label for="processingMode" class="sr-only">AI processing mode</label>
+          <select class="ui-select processing-select" id="processingMode" aria-label="AI processing mode" onchange="onProcessingModeChange(this.value)"></select>
+          <button class="pane-copy-btn processing-add" onclick="openPromptBuilder()" title="Build a custom processing mode" aria-label="Build custom processing mode">+</button>
+        </div>
         <button class="pane-copy-btn" onclick="readPane('refined')" title="Read aloud">READ</button>
         <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
         <button class="pane-copy-btn typo-toggle" onclick="toggleTypoControls('refined')" title="Typography">Aa</button>
@@ -272,7 +284,7 @@
   <footer>
     <div class="footer-row-1">
       <button class="btn-mic" id="btnMic" onclick="toggleRecording()">
-        <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg aria-hidden="true" class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
           <line x1="12" y1="19" x2="12" y2="22"/>
@@ -280,19 +292,19 @@
         </svg>
         <span id="btnLabel">START</span>
       </button>
-      <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
-      <button class="btn-secondary" onclick="toggleCmdPanel()">COMMANDS</button>
-      <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
-      <button class="btn-secondary" id="btnReadBack" onclick="toggleReadBack()" title="Automatically read back each sentence as you dictate">READ BACK</button>
       <button class="btn-secondary" id="btnProcess" onclick="doProcess()" style="display:none" title="Send accumulated text to cloud AI for correction">PROCESS</button>
       <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
-      <button class="btn-secondary" onclick="toggleTimeline()">TIMELINE</button>
-      <button class="btn-secondary" onclick="showAnalytics()">ANALYTICS</button>
+      <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
+      <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
 
-      <div class="footer-templates">
-        <span class="footer-template-label">TEMPLATE</span>
-        <div class="template-selector" id="templateSelector"></div>
-        <button class="btn-secondary" onclick="openPromptBuilder()" title="Build custom template" aria-label="Build custom template" style="padding:4px 8px;font-size:0.55rem">+</button>
+      <div class="more-group">
+        <button class="btn-secondary" id="btnMore" onclick="toggleMoreMenu()" aria-haspopup="true" aria-expanded="false">MORE &#9662;</button>
+        <div class="copy-dropdown more-dropdown" id="moreDropdown">
+          <button class="copy-option" onclick="toggleCmdPanel(); closeMoreMenu()">Voice Commands</button>
+          <button class="copy-option" id="btnReadBack" onclick="toggleReadBack(); closeMoreMenu()" title="Automatically read back each sentence as you dictate">Read Back</button>
+          <button class="copy-option" onclick="toggleTimeline(); closeMoreMenu()">Timeline</button>
+          <button class="copy-option" onclick="showAnalytics(); closeMoreMenu()">Analytics</button>
+        </div>
       </div>
 
       <div class="ai-mode-group" title="AI provider mode">

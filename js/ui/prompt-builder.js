@@ -4,7 +4,10 @@
  * prompt templates with live AI preview.
  */
 
-import { getAllTemplates, saveCustomTemplate } from '../ai/prompt-templates.js';
+import {
+  getAllTemplates, saveCustomTemplate, removeTemplate,
+  isBuiltinTemplate, loadHiddenBuiltins, restoreBuiltins,
+} from '../ai/prompt-templates.js';
 
 const SECTION_META = {
   systemPrompt: {
@@ -49,6 +52,9 @@ export class PromptBuilder {
 
     /** @type {((key: string, template: object) => void) | null} */
     this.onSave = null;
+
+    /** Fired after a preset is deleted, hidden, or restored. */
+    this.onChange = null;
   }
 
   // ──────────────────────────────────────────
@@ -66,20 +72,14 @@ export class PromptBuilder {
     this._injectStyles();
     this.render();
 
-    // Always populate the template selector
-    this._renderTemplateSelector();
-
-    // Load template data into fields
+    // Load template data into fields and highlight it in the preset list
     const loadKey = templateKey || null;
     if (loadKey) {
       const all = getAllTemplates();
       const t = all[loadKey];
-      if (t) {
-        this._populateFromTemplate(loadKey, t);
-        // Select it in the dropdown
-        if (this._templateSelect) this._templateSelect.value = loadKey;
-      }
+      if (t) this._populateFromTemplate(loadKey, t);
     }
+    this._refreshPresetList();
 
     document.body.appendChild(this._el);
   }
@@ -114,9 +114,11 @@ export class PromptBuilder {
     // Header
     modal.appendChild(this._renderHeader());
 
-    // Body: sections + preview
+    // Body: preset list + sections + preview
     const body = document.createElement('div');
     body.className = 'prompt-builder-body';
+
+    body.appendChild(this._renderPresetList());
 
     this._sectionsEl = document.createElement('div');
     this._sectionsEl.className = 'prompt-builder-sections';
@@ -140,21 +142,6 @@ export class PromptBuilder {
   _renderHeader() {
     const header = document.createElement('div');
     header.className = 'prompt-builder-header';
-
-    // Template selector row
-    const selectorRow = document.createElement('div');
-    selectorRow.className = 'pb-selector-row';
-
-    const selectorLabel = document.createElement('span');
-    selectorLabel.className = 'pb-selector-label';
-    selectorLabel.textContent = 'LOAD TEMPLATE';
-    selectorRow.appendChild(selectorLabel);
-
-    this._templateSelect = document.createElement('select');
-    this._templateSelect.className = 'pb-template-select';
-    selectorRow.appendChild(this._templateSelect);
-
-    header.appendChild(selectorRow);
 
     // Name input row
     const nameRow = document.createElement('div');
@@ -185,39 +172,150 @@ export class PromptBuilder {
     return header;
   }
 
-  /** Populate the template dropdown and wire change handler. */
-  _renderTemplateSelector() {
-    if (!this._templateSelect) return;
+  // ──────────────────────────────────────────
+  // Preset list (left column) — load / delete / hide / restore
+  // ──────────────────────────────────────────
 
+  /** Build the left-hand preset manager panel. */
+  _renderPresetList() {
+    const panel = document.createElement('div');
+    panel.className = 'pb-preset-list';
+
+    const head = document.createElement('div');
+    head.className = 'pb-preset-list-head';
+    const title = document.createElement('span');
+    title.className = 'pb-preset-list-title';
+    title.textContent = 'PRESETS';
+    head.appendChild(title);
+
+    const newBtn = document.createElement('button');
+    newBtn.className = 'pb-preset-new';
+    newBtn.textContent = '+ New';
+    newBtn.title = 'Start a new blank preset';
+    newBtn.addEventListener('click', () => this._newPreset());
+    head.appendChild(newBtn);
+    panel.appendChild(head);
+
+    this._presetRows = document.createElement('div');
+    this._presetRows.className = 'pb-preset-rows';
+    panel.appendChild(this._presetRows);
+
+    this._restoreBtn = document.createElement('button');
+    this._restoreBtn.className = 'pb-preset-restore';
+    this._restoreBtn.textContent = '↺ Restore defaults';
+    this._restoreBtn.title = 'Bring back hidden built-in presets';
+    this._restoreBtn.addEventListener('click', () => this._restoreDefaults());
+    panel.appendChild(this._restoreBtn);
+
+    return panel;
+  }
+
+  /** Re-render the preset rows and the restore button's visibility. */
+  _refreshPresetList() {
+    if (!this._presetRows) return;
     const all = getAllTemplates();
-    this._templateSelect.innerHTML = '';
-
-    const blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = '— New blank template —';
-    this._templateSelect.appendChild(blank);
-
+    this._presetRows.innerHTML = '';
     for (const [key, tmpl] of Object.entries(all)) {
-      const opt = document.createElement('option');
-      opt.value = key;
-      opt.textContent = tmpl.label || key;
-      this._templateSelect.appendChild(opt);
+      this._presetRows.appendChild(this._renderPresetRow(key, tmpl));
     }
+    if (this._restoreBtn) {
+      this._restoreBtn.style.display = loadHiddenBuiltins().length ? '' : 'none';
+    }
+  }
 
-    this._templateSelect.addEventListener('change', () => {
-      const key = this._templateSelect.value;
-      if (!key) {
-        // Reset to blank
-        this._editingKey = null;
-        this._clearFields();
-        return;
-      }
-      const tmpl = all[key];
-      if (tmpl) {
-        this._editingKey = key;
-        this._populateFromTemplate(key, tmpl);
-      }
-    });
+  /** One row: click to load, trailing button to delete (custom) / hide (built-in). */
+  _renderPresetRow(key, tmpl) {
+    const row = document.createElement('div');
+    row.className = 'pb-preset-row' + (key === this._editingKey ? ' active' : '');
+    row.dataset.key = key;
+
+    const main = document.createElement('button');
+    main.className = 'pb-preset-row-main';
+    main.addEventListener('click', () => this._loadPreset(key));
+
+    const name = document.createElement('span');
+    name.className = 'pb-preset-row-name';
+    name.textContent = tmpl.label || key;
+    main.appendChild(name);
+
+    const builtin = isBuiltinTemplate(key);
+    const badge = document.createElement('span');
+    badge.className = 'pb-preset-row-badge' + (builtin ? '' : ' custom');
+    badge.textContent = builtin ? 'built-in' : 'custom';
+    main.appendChild(badge);
+    row.appendChild(main);
+
+    const del = document.createElement('button');
+    del.className = 'pb-preset-del';
+    del.innerHTML = '&times;';
+    del.title = builtin ? 'Hide this built-in preset' : 'Delete this preset';
+    del.setAttribute('aria-label', `${del.title}: ${tmpl.label || key}`);
+    del.addEventListener('click', e => { e.stopPropagation(); this._confirmRemove(row, key); });
+    row.appendChild(del);
+
+    return row;
+  }
+
+  /** Swap the row's delete button into an inline confirm control. */
+  _confirmRemove(row, key) {
+    const del = row.querySelector('.pb-preset-del');
+    if (!del) return;
+    const confirm = document.createElement('span');
+    confirm.className = 'pb-preset-confirm';
+
+    const yes = document.createElement('button');
+    yes.className = 'pb-confirm-yes';
+    yes.textContent = isBuiltinTemplate(key) ? 'Hide' : 'Delete';
+    yes.addEventListener('click', e => { e.stopPropagation(); this._removePreset(key); });
+
+    const no = document.createElement('button');
+    no.className = 'pb-confirm-no';
+    no.innerHTML = '&times;';
+    no.title = 'Cancel';
+    no.addEventListener('click', e => { e.stopPropagation(); this._refreshPresetList(); });
+
+    confirm.appendChild(yes);
+    confirm.appendChild(no);
+    del.replaceWith(confirm);
+  }
+
+  /** Remove a preset, keeping at least one visible, then notify the app. */
+  _removePreset(key) {
+    if (Object.keys(getAllTemplates()).length <= 1) {
+      window.flashCmd?.('AT LEAST ONE PRESET MUST REMAIN');
+      this._refreshPresetList();
+      return;
+    }
+    const builtin = isBuiltinTemplate(key);
+    removeTemplate(key);
+    if (this._editingKey === key) this._newPreset();
+    this._refreshPresetList();
+    window.flashCmd?.(builtin ? 'PRESET HIDDEN' : 'PRESET DELETED');
+    this.onChange?.();
+  }
+
+  /** Restore every hidden built-in preset. */
+  _restoreDefaults() {
+    restoreBuiltins();
+    this._refreshPresetList();
+    window.flashCmd?.('DEFAULT PRESETS RESTORED');
+    this.onChange?.();
+  }
+
+  /** Load a preset into the editor. */
+  _loadPreset(key) {
+    const tmpl = getAllTemplates()[key];
+    if (!tmpl) return;
+    this._editingKey = key;
+    this._populateFromTemplate(key, tmpl);
+    this._refreshPresetList();
+  }
+
+  /** Reset the editor to a blank new preset. */
+  _newPreset() {
+    this._editingKey = null;
+    this._clearFields();
+    this._refreshPresetList();
   }
 
   /** Clear all fields to blank state. */

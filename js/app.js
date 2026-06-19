@@ -10,13 +10,13 @@ import { CommandParser } from './stt/command-parser.js';
 import { AIClient } from './ai/ai-client.js';
 import { CorrectionPipeline } from './ai/correction-pipeline.js';
 import { PromptStructurer } from './ai/prompt-structurer.js';
-import { getAllTemplates } from './ai/prompt-templates.js';
+import { getAllTemplates, restoreBuiltins } from './ai/prompt-templates.js';
 import { APISettingsModal } from './ui/api-settings.js';
 import { copyToClipboard } from './utils/clipboard.js';
 import { saveSession, loadSession, clearSession, saveSettings, loadSettings,
   loadSessionsIndex, saveSessionToList, loadSavedSession, deleteSessionFromList,
   renameSession, exportSessions, importSessions,
-  readJSON, writeJSON } from './utils/persistence.js';
+  readJSON, writeJSON, readRaw, writeRaw } from './utils/persistence.js';
 import { fetchProjects, sortByModified, sortByName, saveProjectSettings, loadProjectSettings } from './utils/projects.js';
 import { PromptBuilder } from './ui/prompt-builder.js';
 import { AmbientDetector } from './stt/ambient-detector.js';
@@ -54,6 +54,8 @@ const state = {
   structuredPrompt: '',
   savedSelection: null,
   copyMenuOpen: false,
+  moreMenuOpen: false,
+  folderModalOpener: null,
   autoSaveTimer: null,
   structureView: false,
   serverAvailable: true,
@@ -93,12 +95,16 @@ async function loadProjectsRoot() {
 }
 
 async function openFolderBrowser() {
+  state.folderModalOpener = document.activeElement; // restore focus here on close
   $('folderModal').style.display = 'flex';
+  $('btnCloseBrowser')?.focus();                    // move focus into the dialog (WCAG 2.4.3)
   await browseTo(currentProjectsRoot || null);
 }
 
 function closeFolderBrowser() {
   $('folderModal').style.display = 'none';
+  state.folderModalOpener?.focus?.();               // return focus to the trigger
+  state.folderModalOpener = null;
 }
 
 async function browseTo(path) {
@@ -1062,25 +1068,28 @@ async function copyPaneContent(pane) {
 // Template Selector
 // ══════════════════════════════════════════
 function renderTemplateSelector() {
-  const container = $('templateSelector');
-  if (!container) return;
+  const select = $('processingMode');
+  if (!select) return;
   const all = getAllTemplates();
-  container.innerHTML = '';
+  select.innerHTML = '';
   for (const [key, tmpl] of Object.entries(all)) {
-    const btn = document.createElement('button');
-    btn.className = 'template-btn' + (key === promptStructurer.currentTemplate ? ' active' : '');
-    btn.textContent = tmpl.label;
-    btn.title = tmpl.description;
-    btn.onclick = () => {
-      promptStructurer.setTemplate(key);
-      renderTemplateSelector();
-      _saveCurrentProjectSettings();
-      // Auto-structure when switching templates if there's text
-      const text = correctionPipeline.correctedText || state.rawTranscript;
-      if (text.trim()) doStructure({ force: true });
-    };
-    container.appendChild(btn);
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = tmpl.label;
+    opt.title = tmpl.description;
+    if (key === promptStructurer.currentTemplate) opt.selected = true;
+    select.appendChild(opt);
   }
+  select.title = all[promptStructurer.currentTemplate]?.description || 'AI processing mode';
+}
+
+function onProcessingModeChange(key) {
+  if (!promptStructurer.setTemplate(key)) return;
+  renderTemplateSelector();
+  _saveCurrentProjectSettings();
+  // Auto-structure when switching modes if there's text to reprocess
+  const text = correctionPipeline.correctedText || state.rawTranscript;
+  if (text.trim()) doStructure({ force: true });
 }
 
 // ══════════════════════════════════════════
@@ -1160,6 +1169,37 @@ function toggleCopyMenu() {
   $('copyDropdown').classList.toggle('show', state.copyMenuOpen);
   const btn = document.querySelector('.btn-copy-menu');
   if (btn) btn.setAttribute('aria-expanded', String(state.copyMenuOpen));
+}
+
+function setTheme(mode) {
+  const dark = mode === 'dark';
+  // Light is the bare-:root default, so clear the attribute rather than set
+  // data-theme="light" — keeps this in step with the anti-flash <head> script.
+  if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+  writeRaw('dictate_theme', dark ? 'dark' : 'light');
+  $('btnThemeToggle')?.setAttribute('aria-pressed', String(dark));
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  setTheme(isDark ? 'light' : 'dark');
+  flashCmd(isDark ? 'LIGHT MODE' : 'DARK MODE');
+}
+
+function toggleMoreMenu() {
+  state.moreMenuOpen = !state.moreMenuOpen;
+  $('moreDropdown')?.classList.toggle('show', state.moreMenuOpen);
+  $('btnMore')?.setAttribute('aria-expanded', String(state.moreMenuOpen));
+}
+
+function closeMoreMenu({ returnFocus = false } = {}) {
+  state.moreMenuOpen = false;
+  $('moreDropdown')?.classList.remove('show');
+  $('btnMore')?.setAttribute('aria-expanded', 'false');
+  // Return focus to the trigger only on keyboard dismiss (Escape) — not on
+  // outside-click or item-activation, where focus belongs elsewhere.
+  if (returnFocus) $('btnMore')?.focus();
 }
 
 
@@ -1447,6 +1487,7 @@ document.addEventListener('keydown', e => {
     $('cmdPanel').classList.remove('open');
     $('copyDropdown')?.classList.remove('show');
     state.copyMenuOpen = false;
+    closeMoreMenu({ returnFocus: true });
   }
 
   // Ctrl+Shift combos
@@ -1479,6 +1520,7 @@ document.addEventListener('click', e => {
     state.copyMenuOpen = false;
     $('copyDropdown')?.classList.remove('show');
   }
+  if (state.moreMenuOpen && !e.target.closest('.more-group')) closeMoreMenu();
 });
 
 // ══════════════════════════════════════════
@@ -1656,6 +1698,21 @@ window.showServerSetup = showServerSetup;
 promptBuilder.onSave = (key, template) => {
   renderTemplateSelector();
   flashCmd('TEMPLATE SAVED: ' + (template.label || key).toUpperCase());
+};
+
+// Fired when presets are deleted/hidden/restored in the manager.
+promptBuilder.onChange = () => {
+  // Defensive: never leave the app with zero presets (e.g. corrupted storage
+  // that hid every built-in with no customs left) — restore the defaults.
+  if (Object.keys(getAllTemplates()).length === 0) restoreBuiltins();
+  // If the active mode was just removed, fall back to a still-visible preset.
+  const visible = getAllTemplates();
+  if (!visible[promptStructurer.currentTemplate]) {
+    const next = visible.freeform ? 'freeform' : Object.keys(visible)[0];
+    if (next) promptStructurer.setTemplate(next);
+  }
+  renderTemplateSelector();
+  _saveCurrentProjectSettings();
 };
 
 function openPromptBuilder(templateKey = null) {
@@ -2038,6 +2095,18 @@ function init() {
   $('btnBrowserCancel').onclick = closeFolderBrowser;
   $('btnBrowserSelect').onclick = selectBrowserFolder;
   $('folderModal').onclick = (e) => { if (e.target === $('folderModal')) closeFolderBrowser(); };
+  // Modal keyboard handling: Escape closes, Tab is trapped inside (WCAG 2.1.2 / 2.4.3)
+  $('folderModal').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeFolderBrowser(); return; }
+    if (e.key !== 'Tab') return;
+    const focusables = Array.from(
+      $('folderModal').querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter(el => el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
 
   // Session selector
   renderSessionSelector();
@@ -2348,6 +2417,10 @@ window.copyRefined = copyRefined;
 window.copyStructured = copyStructured;
 window.copyToClaude = copyToClaude;
 window.toggleCopyMenu = toggleCopyMenu;
+window.toggleTheme = toggleTheme;
+window.toggleMoreMenu = toggleMoreMenu;
+window.closeMoreMenu = closeMoreMenu;
+window.onProcessingModeChange = onProcessingModeChange;
 window.doStructure = doStructure;
 window.exitStructureView = exitStructureView;
 window.copyPaneContent = copyPaneContent;
@@ -2359,6 +2432,7 @@ window.onImportSessions = onImportSessions;
 window.openAISettings = () => apiSettingsModal.open();
 window.openGeminiWizard = () => geminiWizard.open();
 window.openPromptBuilder = openPromptBuilder;
+window.flashCmd = flashCmd;
 window.showAnalytics = showAnalytics;
 window.showSearchResults = showSearchResults;
 window.openCommandBuilder = openCommandBuilder;
@@ -2372,6 +2446,7 @@ window.updateTypo = updateTypo;
 window.setAIMode = setAIMode;
 
 // Boot
+setTheme(readRaw('dictate_theme', 'light')); // reflect saved theme onto <html> + toggle button
 init();
 initAIModeSwitch();
 loadTypoSettings();

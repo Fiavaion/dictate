@@ -187,6 +187,7 @@ Only include sections that have relevant content from the dictation.`,
 };
 
 const CUSTOM_STORAGE_KEY = 'fiavaion-dictate-templates';
+const HIDDEN_STORAGE_KEY = 'fiavaion-dictate-hidden-builtins';
 
 /** Load custom templates from localStorage */
 export function loadCustomTemplates() {
@@ -200,7 +201,55 @@ export function saveCustomTemplate(key, template) {
   writeJSON(CUSTOM_STORAGE_KEY, custom);
 }
 
-/** Get all templates (built-in + custom) */
+/** True if `key` is one of the shipped built-in presets. */
+export function isBuiltinTemplate(key) {
+  return Object.prototype.hasOwnProperty.call(TEMPLATES, key);
+}
+
+/** Keys of built-in presets the user has hidden. */
+export function loadHiddenBuiltins() {
+  const list = readJSON(HIDDEN_STORAGE_KEY, []);
+  return Array.isArray(list) ? list : [];
+}
+
+/** Delete a custom preset (built-ins can't be deleted — they're hidden instead). */
+export function deleteCustomTemplate(key) {
+  const custom = loadCustomTemplates();
+  if (key in custom) {
+    delete custom[key];
+    writeJSON(CUSTOM_STORAGE_KEY, custom);
+  }
+}
+
+/** Hide a built-in preset from all lists (reversible via restoreBuiltins). */
+export function hideBuiltin(key) {
+  if (!isBuiltinTemplate(key)) return;
+  const hidden = loadHiddenBuiltins();
+  if (!hidden.includes(key)) {
+    hidden.push(key);
+    writeJSON(HIDDEN_STORAGE_KEY, hidden);
+  }
+}
+
+/** Bring back every hidden built-in preset. */
+export function restoreBuiltins() {
+  writeJSON(HIDDEN_STORAGE_KEY, []);
+}
+
+/** Remove a preset. A key can be both a built-in and a custom override of it,
+ * so clear both: delete any custom entry and hide the built-in if present.
+ * Prevents a hidden built-in's custom override from reappearing on reload. */
+export function removeTemplate(key) {
+  deleteCustomTemplate(key);
+  if (isBuiltinTemplate(key)) hideBuiltin(key);
+}
+
+/** Get all visible templates (built-in minus hidden, plus custom). */
 export function getAllTemplates() {
-  return { ...TEMPLATES, ...loadCustomTemplates() };
+  const hidden = loadHiddenBuiltins();
+  const visibleBuiltins = {};
+  for (const [k, v] of Object.entries(TEMPLATES)) {
+    if (!hidden.includes(k)) visibleBuiltins[k] = v;
+  }
+  return { ...visibleBuiltins, ...loadCustomTemplates() };
 }
