@@ -74,6 +74,7 @@ class OllamaOriginTests(TempConfigTest):
         self.assertEqual(server.ollama_origin("https://Ollama.Example"), "https://ollama.example")
         self.assertEqual(server.ollama_origin("http://[::1]:11434"), "http://[::1]:11434")
         self.assertEqual(server.ollama_origin("http://host:80"), "http://host")
+        self.assertEqual(server.ollama_origin("http://bücher.de"), "http://xn--bcher-kva.de")
 
     def test_invalid_stored_value_is_dropped_on_read(self):
         server.CONFIG_FILE.write_text(json.dumps({"ollamaUrl": "http://x;sandbox", "projectsRoot": "keep"}), encoding="utf-8")

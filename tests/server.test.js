@@ -63,6 +63,7 @@ test('valid URLs are normalised to an origin', () => {
   assert.equal(ollamaOrigin('https://Ollama.Example'), 'https://ollama.example');
   assert.equal(ollamaOrigin('http://[::1]:11434'), 'http://[::1]:11434');
   assert.equal(ollamaOrigin('http://host:80'), 'http://host');
+  assert.equal(ollamaOrigin('http://bücher.de'), 'http://xn--bcher-kva.de');
 });
 
 test('injection payloads are rejected over HTTP and never persisted', async () => {

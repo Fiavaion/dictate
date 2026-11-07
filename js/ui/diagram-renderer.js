@@ -153,8 +153,13 @@ function importSvg(svgMarkup) {
 let renderQueue = Promise.resolve();
 let renderCount = 0;
 
+class RenderTimeout extends Error {}
+
 export class DiagramRenderer {
-  constructor() {
+  /** @param {{ timeoutMs?: number }} [options]  max time per render, including loading Mermaid */
+  constructor({ timeoutMs = 15000 } = {}) {
+    this._timeoutMs = timeoutMs;
+
     /** @type {HTMLElement|null} */
     this._container = null;
 
@@ -173,14 +178,27 @@ export class DiagramRenderer {
    */
   render(mermaidSyntax, containerId) {
     // withCssomStyles patches shared prototypes, so renders must never overlap:
-    // each one waits for the previous to finish (whatever its outcome).
-    const run = renderQueue.then(() => this._render(mermaidSyntax, containerId));
+    // each one waits for the previous to finish (whatever its outcome). Each render
+    // has a deadline, so a stalled CDN load or Mermaid render cannot block the queue;
+    // it rejects with a timeout and the prototypes are restored at that moment.
+    const run = renderQueue.then(() => {
+      let timer;
+      const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new RenderTimeout(
+          `Diagram render timed out after ${Math.round(this._timeoutMs / 1000)} s`)), this._timeoutMs);
+      });
+      deadline.catch(() => {}); // consumed by the races in _render
+      return this._render(mermaidSyntax, containerId, deadline).finally(() => clearTimeout(timer));
+    });
     renderQueue = run.catch(() => {});
     return run;
   }
 
-  async _render(mermaidSyntax, containerId) {
-    await loadMermaid();
+  async _render(mermaidSyntax, containerId, deadline) {
+    // Every wait is raced against the deadline, so this settles as soon as it passes;
+    // a promise that settles later has no listener and cannot patch anything again.
+    const inTime = promise => Promise.race([promise, deadline]);
+    await inTime(loadMermaid());
 
     this._container = document.getElementById(containerId) || this._container;
     if (!this._container) return;
@@ -192,7 +210,7 @@ export class DiagramRenderer {
       const id = `mermaid-${Date.now()}-${++renderCount}`;
       const collected = [];
       const { svg } = await withCssomStyles(
-        () => window.mermaid.render(id, mermaidSyntax),
+        () => inTime(window.mermaid.render(id, mermaidSyntax)),
         css => { collected.push(css); diagramSheet.replaceSync(collected.join('\n')); },
       );
 
@@ -216,6 +234,7 @@ export class DiagramRenderer {
           <pre class="diagram-error-source">${this._escHtml(mermaidSyntax)}</pre>
         </div>
       `;
+      if (e instanceof RenderTimeout) throw e;
     }
   }
 

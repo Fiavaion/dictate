@@ -90,6 +90,11 @@ def ollama_origin(value):
     host = parts.hostname
     if ":" in host:
         host = f"[{host}]"
+    else:
+        try:  # internationalised names -> punycode, as Express and the browser do
+            host = host.encode("idna").decode("ascii")
+        except UnicodeError:
+            return None
     default_port = 80 if parts.scheme == "http" else 443
     suffix = f":{port}" if port and port != default_port else ""
     origin = f"{parts.scheme}://{host}{suffix}"

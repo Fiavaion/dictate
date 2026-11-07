@@ -1923,8 +1923,12 @@ async function generateDiagram(type = 'auto') {
       $('refinedLabel').textContent = diagram.label.toUpperCase();
       $('refinedLabel').classList.add('structured');
       $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
-      await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
-      flashCmd('DIAGRAM GENERATED');
+      try {
+        await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
+        flashCmd('DIAGRAM GENERATED');
+      } catch {
+        flashCmd('DIAGRAM FAILED'); // timed out; the pane shows the error
+      }
     } else {
       flashCmd('DIAGRAM FAILED');
     }
