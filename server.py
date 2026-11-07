@@ -5,6 +5,7 @@ import http.server
 import json
 import os
 import pathlib
+import re
 import ssl
 import time
 import urllib.parse
@@ -28,8 +29,19 @@ def _check_rate_limit(ip: str) -> bool:
     return True
 
 DEFAULT_PROJECTS_ROOT = str(pathlib.Path.home() / "AIprojects")
-CONFIG_FILE = pathlib.Path(__file__).parent / "config.json"
+APP_ROOT = pathlib.Path(__file__).parent
+CONFIG_FILE = APP_ROOT / "config.json"
 PORT = 31000
+
+APP_ORIGINS = {f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"}
+ALLOWED_HOSTS = {"localhost", "127.0.0.1"}
+MAX_BODY_BYTES = 4 * 1024 * 1024
+MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# An origin safe to place in a CSP header: no spaces, ';', ',' or quotes can get through.
+OLLAMA_ORIGIN = re.compile(r"https?://([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?")
+STATIC_DIRS = ("js", "css")
+# index.html carries a static meta CSP for GitHub Pages; this server sends the header instead.
+META_CSP = re.compile(r'<meta http-equiv="Content-Security-Policy"[^>]*>\r?\n?')
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +72,81 @@ def set_projects_root(path_str):
     cfg["projectsRoot"] = str(p)
     _save_config(cfg)
     return True, str(p)
+
+
+def ollama_origin(value):
+    """Return the http(s) origin of an Ollama URL, or None if it is not a valid one."""
+    try:
+        parts = urllib.parse.urlsplit(value)
+        port = parts.port
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return None
+    if parts.username or parts.password:
+        return None
+    if port is not None and not 1 <= port <= 65535:
+        return None
+    host = parts.hostname
+    if ":" in host:
+        host = f"[{host}]"
+    default_port = 80 if parts.scheme == "http" else 443
+    suffix = f":{port}" if port and port != default_port else ""
+    origin = f"{parts.scheme}://{host}{suffix}"
+    match = OLLAMA_ORIGIN.fullmatch(origin)
+    if not match or (match.group(2) and not 1 <= int(match.group(2)[1:]) <= 65535):
+        return None
+    return origin
+
+
+def get_ollama_url():
+    """The saved Ollama origin, re-validated on every read; an invalid stored value is dropped."""
+    cfg = _load_config()
+    raw = cfg.get("ollamaUrl")
+    if raw is None:
+        return None
+    origin = ollama_origin(raw) if isinstance(raw, str) else None
+    if origin != raw:
+        cfg.pop("ollamaUrl", None)
+        if origin:
+            cfg["ollamaUrl"] = origin
+        _save_config(cfg)
+    return origin
+
+
+def set_ollama_url(value):
+    cfg = _load_config()
+    if not value:
+        cfg.pop("ollamaUrl", None)
+        _save_config(cfg)
+        return True, None
+    origin = ollama_origin(value)
+    if not origin:
+        return False, "Ollama URL must be an http(s) URL"
+    cfg["ollamaUrl"] = origin
+    _save_config(cfg)
+    return True, origin
+
+
+def content_security_policy():
+    """Same policy as electron/server.js; connect-src includes the saved Ollama URL."""
+    connect = ["'self'", "http://localhost:*", "http://127.0.0.1:*"]
+    saved = get_ollama_url()
+    if saved:
+        connect.append(saved)
+    return "; ".join([
+        "default-src 'self'",
+        "script-src 'self' https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js",
+        "style-src 'self' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data:",
+        "connect-src " + " ".join(connect),
+        "media-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+    ])
 
 
 # ---------------------------------------------------------------------------
@@ -247,9 +334,10 @@ def _list_anthropic_models(api_key):
 
 def _list_google_models(api_key):
     """Fetch available models from the Google Generative Language API (GET)."""
-    url = ("https://generativelanguage.googleapis.com/v1beta/models?key="
-           + urllib.parse.quote(api_key, safe=""))
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        headers={"x-goog-api-key": api_key},
+    )
     resp = urllib.request.urlopen(req, context=_SSL_CTX, timeout=10)
     data = json.loads(resp.read().decode("utf-8"))
     return data.get("models", [])
@@ -310,9 +398,9 @@ def _call_google(api_key, model, prompt, system_prompt, options):
     }).encode()
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent?key={api_key}"
+        f"{model}:generateContent"
     )
-    return _upstream_request(url, body, {"Content-Type": "application/json"})
+    return _upstream_request(url, body, {"Content-Type": "application/json", "x-goog-api-key": api_key})
 
 
 def _extract_text(provider, data):
@@ -382,26 +470,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # Use HTTP/1.1 so the browser can reuse connections properly
     protocol_version = "HTTP/1.1"
 
-    _ALLOWED_ORIGINS = {
-        "http://localhost:31000",
-        "http://127.0.0.1:31000",
-        "https://fiavaion.github.io",
-    }
+    def __init__(self, *args, **kwargs):
+        # Serve from the app folder regardless of the process working directory.
+        super().__init__(*args, directory=str(APP_ROOT), **kwargs)
 
-    def _cors_headers(self):
-        """Add CORS headers — restrict to known origins only."""
-        origin = self.headers.get("Origin", "")
-        allowed = origin if origin in self._ALLOWED_ORIGINS else "http://localhost:31000"
-        self.send_header("Access-Control-Allow-Origin", allowed)
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Vary", "Origin")
-
-    def _security_headers(self):
-        """Add security headers to every response."""
+    def end_headers(self):
+        """Add security headers (including the CSP) to every response."""
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("Content-Security-Policy", content_security_policy())
+        super().end_headers()
 
     def _json_ok(self, data, code=200):
         """Send a JSON response with proper headers."""
@@ -409,8 +488,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self._cors_headers()
-        self._security_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -418,18 +495,75 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         """Send a JSON error response."""
         self._json_ok({"error": message}, code)
 
-    # -- CORS preflight -------------------------------------------------------
+    # -- Request guards ---------------------------------------------------------
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self._cors_headers()
-        self._security_headers()
-        self.send_header("Content-Length", "0")
+    def _host_allowed(self):
+        """Only answer requests addressed to localhost (blocks DNS rebinding)."""
+        host = self.headers.get("Host", "").rsplit(":", 1)[0].lower()
+        if host in ALLOWED_HOSTS:
+            return True
+        self._json_error(403, "Forbidden")
+        return False
+
+    def _origin_allowed(self):
+        """State-changing requests must come from the app itself (or a non-browser client)."""
+        origin = self.headers.get("Origin")
+        if origin is None or origin in APP_ORIGINS:
+            return True
+        self._json_error(403, "Forbidden origin")
+        return False
+
+    # -- Static files: only the page, its scripts and its styles ----------------
+
+    def _serve_index(self, head_only=False):
+        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+        body = META_CSP.sub("", html, count=1).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
+        if not head_only:
+            self.wfile.write(body)
+
+    def _serve_static(self, path, head_only=False):
+        if path in ("/", "/index.html"):
+            self._serve_index(head_only)
+        elif self._is_static_file(path):
+            super().do_HEAD() if head_only else super().do_GET()
+        else:
+            self._json_error(404, "Not found")
+
+    def _is_static_file(self, path):
+        """True only for an existing file inside js/ or css/ (after resolving '..' and links)."""
+        try:
+            target = pathlib.Path(self.translate_path(path)).resolve()
+            if not target.is_file():
+                return False
+        except (ValueError, OSError):  # e.g. an embedded null byte (%00)
+            return False
+        for folder in STATIC_DIRS:
+            try:
+                target.relative_to((APP_ROOT / folder).resolve())
+                return True
+            except ValueError:
+                continue
+        return False
+
+    def list_directory(self, path):
+        """Never list directories."""
+        self._json_error(404, "Not found")
+        return None
+
+    def do_HEAD(self):
+        if not self._host_allowed():
+            return
+        self._serve_static(urllib.parse.urlparse(self.path).path, head_only=True)
 
     # -- GET routes -----------------------------------------------------------
 
     def do_GET(self):
+        if not self._host_allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/system/check":
             import sys
@@ -441,6 +575,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_ok(get_projects())
         elif parsed.path == "/api/projects-root":
             self._json_ok({"path": str(get_projects_root())})
+        elif parsed.path == "/api/ollama-url":
+            self._json_ok({"url": get_ollama_url()})
         elif parsed.path == "/api/browse":
             qs = urllib.parse.parse_qs(parsed.query)
             req_path = qs.get("path", [None])[0]
@@ -455,17 +591,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 parsed.path[len("/api/projects/"):-len("/scan")]
             )
             self._json_ok(scan_project(project_name))
+        elif parsed.path.startswith("/api/"):
+            self._json_error(404, "Not found")
         else:
-            super().do_GET()
+            self._serve_static(parsed.path)
 
     # -- POST routes ----------------------------------------------------------
 
     def do_POST(self):
+        if not self._host_allowed() or not self._origin_allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
         if path == "/api/projects-root":
             self._handle_set_projects_root()
+        elif path == "/api/ollama-url":
+            self._handle_set_ollama_url()
         elif path == "/api/ai/proxy":
             self._handle_ai_proxy()
         elif path == "/api/ai/models":
@@ -476,10 +618,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _read_body_json(self):
         """Read and parse the request body as JSON."""
         length = int(self.headers.get("Content-Length", 0))
-        if length == 0:
+        if length <= 0:
             raise ValueError("Empty request body")
+        if length > MAX_BODY_BYTES:
+            raise ValueError("Request body too large")
         raw = self.rfile.read(length)
-        return json.loads(raw)
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("Expected a JSON object")
+        return data
 
     def _handle_set_projects_root(self):
         try:
@@ -487,15 +634,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             self._json_error(400, "Invalid JSON")
             return
-        path = data.get("path", "").strip()
-        if not path:
+        path = data.get("path", "")
+        if not isinstance(path, str) or not path.strip():
             self._json_error(400, "Path is required")
             return
-        ok, msg = set_projects_root(path)
+        ok, msg = set_projects_root(path.strip())
         if ok:
             self._json_ok({"path": msg})
         else:
             self._json_error(400, msg)
+
+    def _handle_set_ollama_url(self):
+        try:
+            data = self._read_body_json()
+        except Exception:
+            self._json_error(400, "Invalid JSON")
+            return
+        url = data.get("url")
+        if url is not None and not isinstance(url, str):
+            self._json_error(400, "url must be a string")
+            return
+        ok, value = set_ollama_url((url or "").strip())
+        if ok:
+            self._json_ok({"url": value})
+        else:
+            self._json_error(400, value)
 
     def _handle_ai_models(self):
         """Return the list of available models for a cloud provider."""
@@ -558,6 +721,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_error(400, f"Unknown provider: {provider}")
             return
 
+        if not all(isinstance(v, str) for v in (api_key, model, prompt, system_prompt)) \
+                or not isinstance(options, dict):
+            self._json_error(400, "Invalid request fields")
+            return
+
+        if provider == "google" and not MODEL_ID.fullmatch(model):
+            self._json_error(400, "Invalid model")
+            return
+
         # --- Call upstream API ---
         try:
             if provider == "anthropic":
@@ -581,7 +753,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 # Stream: send NDJSON lines
                 self.send_response(200)
                 self.send_header("Content-Type", "application/x-ndjson")
-                self._cors_headers()
                 self.send_header("Transfer-Encoding", "chunked")
                 self.end_headers()
                 _relay_sse(provider, resp, self.wfile)
@@ -593,7 +764,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     # Google with stream=true: fake it as two NDJSON lines
                     self.send_response(200)
                     self.send_header("Content-Type", "application/x-ndjson")
-                    self._cors_headers()
                     self.send_header("Transfer-Encoding", "chunked")
                     self.end_headers()
                     self.wfile.write(

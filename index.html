@@ -3,23 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- CSP for static hosting (GitHub Pages). electron/server.js and server.py remove this tag and send the policy as a header. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://generativelanguage.googleapis.com; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>FiavaionDictate — AI-Powered Dictation for Claude Code</title>
 <!-- Apply saved theme before first paint (light is default) to avoid a flash -->
-<script>(function(){try{if(localStorage.getItem('dictate_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script src="js/theme-init.js"></script>
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/ai-panel.css">
 <link rel="stylesheet" href="css/prompt-builder.css">
-<style>
-  .ghost-text {
-    color: var(--dim);
-    opacity: 0.45;
-    font-style: italic;
-    pointer-events: none;
-  }
-  .typing-detected {
-    border-color: var(--warning) !important;
-  }
-</style>
+<link rel="stylesheet" href="css/analytics-dashboard.css">
+<link rel="stylesheet" href="css/api-settings.css">
+<link rel="stylesheet" href="css/command-builder.css">
+<link rel="stylesheet" href="css/confidence-heatmap.css">
+<link rel="stylesheet" href="css/format-cards.css">
+<link rel="stylesheet" href="css/gemini-wizard.css">
+<link rel="stylesheet" href="css/onboarding-wizard.css">
+<link rel="stylesheet" href="css/search-results.css">
+<link rel="stylesheet" href="css/timeline-viewer.css">
+<link rel="stylesheet" href="css/components.css">
 </head>
 <body>
 <a href="#rawContent" class="skip-link">Skip to dictation</a>
@@ -29,7 +30,7 @@
 
 <!-- ══════ Commands Reference Panel ══════ -->
 <div class="cmd-panel" id="cmdPanel" role="region" aria-label="Voice commands reference" tabindex="-1">
-  <button class="cmd-close" onclick="toggleCmdPanel()">CLOSE</button>
+  <button class="cmd-close" data-click="toggleCmdPanel">CLOSE</button>
   <h3>VOICE COMMANDS</h3>
 
   <div class="cmd-group">
@@ -140,15 +141,15 @@
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span class="wizard-btn-label">SETUP</span>
         </button>
-        <button class="btn-gemini-wizard" id="btnGeminiWizard" title="Set up free Cloud AI (Gemini)" aria-label="Set up Gemini Cloud AI" style="display:none">
+        <button class="btn-gemini-wizard" id="btnGeminiWizard" title="Set up free Cloud AI (Gemini)" aria-label="Set up Gemini Cloud AI" hidden>
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
           <span class="wizard-btn-label">GEMINI</span>
         </button>
-        <button class="btn-sort theme-toggle" id="btnThemeToggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" aria-pressed="false" onclick="toggleTheme()">
+        <button class="btn-sort theme-toggle" id="btnThemeToggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" aria-pressed="false" data-click="toggleTheme">
           <svg aria-hidden="true" class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg aria-hidden="true" class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
         </button>
-        <button class="btn-sort" id="btnAISettings" title="AI Provider Settings" aria-label="AI Provider Settings" onclick="openAISettings()">
+        <button class="btn-sort" id="btnAISettings" title="AI Provider Settings" aria-label="AI Provider Settings">
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
@@ -182,7 +183,7 @@
         </button>
       </div>
 
-      <select class="ui-select lang-select" id="langSelect" style="display:none">
+      <select class="ui-select lang-select" id="langSelect" hidden>
         <option value="en-GB" selected>EN-GB</option>
       </select>
       <select class="ui-select voice-select" id="voiceSelect" aria-label="Voice"></select>
@@ -201,15 +202,15 @@
     <div class="pane-header">
       <div class="pane-label">RAW DICTATION</div>
       <div class="pane-actions">
-        <button class="pane-copy-btn" onclick="readPane('raw')" title="Read aloud">READ</button>
-        <button class="pane-copy-btn" onclick="copyRaw()" title="Copy raw text">COPY</button>
-        <button class="pane-copy-btn typo-toggle" onclick="toggleTypoControls('raw')" title="Typography">Aa</button>
+        <button class="pane-copy-btn" data-click="readPane" data-arg="raw" title="Read aloud">READ</button>
+        <button class="pane-copy-btn" data-click="copyRaw" title="Copy raw text">COPY</button>
+        <button class="pane-copy-btn typo-toggle" data-click="toggleTypoControls" data-arg="raw" title="Typography">Aa</button>
       </div>
     </div>
     <div class="typo-controls" id="typoControlsRaw">
-      <label>Size <input type="range" min="12" max="32" value="16" data-pane="raw" data-prop="fontSize" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawSize">16</span>px</label>
-      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="raw" data-prop="letterSpacing" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawTracking">0</span>em</label>
-      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="raw" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRawLeading">1.75</span></label>
+      <label>Size <input type="range" min="12" max="32" value="16" data-pane="raw" data-prop="fontSize" data-input="updateTypo"><span class="typo-val" id="typoValRawSize">16</span>px</label>
+      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="raw" data-prop="letterSpacing" data-input="updateTypo"><span class="typo-val" id="typoValRawTracking">0</span>em</label>
+      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="raw" data-prop="lineHeight" data-input="updateTypo"><span class="typo-val" id="typoValRawLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper raw-pane">
       <div class="transcript-scroll" id="rawScroll" role="log" aria-live="polite" aria-atomic="false" aria-label="Raw dictation transcript">
@@ -217,7 +218,7 @@
           <span class="placeholder" id="placeholder">Press SPACE or click START to begin dictating, or paste text here&#8230;</span>
         </div>
       </div>
-      <div id="ttsBar" class="tts-bar" style="display:none" role="status" aria-live="polite" aria-label="Currently reading"></div>
+      <div id="ttsBar" class="tts-bar" hidden role="status" aria-live="polite" aria-label="Currently reading"></div>
     </div>
 
     <!-- Divider -->
@@ -230,18 +231,18 @@
         <div class="processing-group" title="How the AI processes your dictation">
           <span class="processing-label">PROCESS AS</span>
           <label for="processingMode" class="sr-only">AI processing mode</label>
-          <select class="ui-select processing-select" id="processingMode" aria-label="AI processing mode" onchange="onProcessingModeChange(this.value)"></select>
-          <button class="pane-copy-btn processing-add" onclick="openPromptBuilder()" title="Build a custom processing mode" aria-label="Build custom processing mode">+</button>
+          <select class="ui-select processing-select" id="processingMode" aria-label="AI processing mode" data-change="onProcessingModeChange"></select>
+          <button class="pane-copy-btn processing-add" data-click="openPromptBuilder" title="Build a custom processing mode" aria-label="Build custom processing mode">+</button>
         </div>
-        <button class="pane-copy-btn" onclick="readPane('refined')" title="Read aloud">READ</button>
-        <button class="pane-copy-btn" id="btnCopyRefined" onclick="copyPaneContent('refined')" title="Copy text">COPY</button>
-        <button class="pane-copy-btn typo-toggle" onclick="toggleTypoControls('refined')" title="Typography">Aa</button>
+        <button class="pane-copy-btn" data-click="readPane" data-arg="refined" title="Read aloud">READ</button>
+        <button class="pane-copy-btn" id="btnCopyRefined" data-click="copyPaneContent" data-arg="refined" title="Copy text">COPY</button>
+        <button class="pane-copy-btn typo-toggle" data-click="toggleTypoControls" data-arg="refined" title="Typography">Aa</button>
       </div>
     </div>
     <div class="typo-controls" id="typoControlsRefined">
-      <label>Size <input type="range" min="12" max="32" value="16" data-pane="refined" data-prop="fontSize" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedSize">16</span>px</label>
-      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="refined" data-prop="letterSpacing" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedTracking">0</span>em</label>
-      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="refined" data-prop="lineHeight" oninput="updateTypo(this)"><span class="typo-val" id="typoValRefinedLeading">1.75</span></label>
+      <label>Size <input type="range" min="12" max="32" value="16" data-pane="refined" data-prop="fontSize" data-input="updateTypo"><span class="typo-val" id="typoValRefinedSize">16</span>px</label>
+      <label>Tracking <input type="range" min="-50" max="200" value="1" data-pane="refined" data-prop="letterSpacing" data-input="updateTypo"><span class="typo-val" id="typoValRefinedTracking">0</span>em</label>
+      <label>Leading <input type="range" min="100" max="300" value="175" data-pane="refined" data-prop="lineHeight" data-input="updateTypo"><span class="typo-val" id="typoValRefinedLeading">1.75</span></label>
     </div>
     <div class="pane-wrapper refined-pane">
       <div class="transcript-scroll" id="refinedScroll" role="log" aria-live="polite" aria-atomic="false" aria-label="AI-corrected output">
@@ -259,7 +260,7 @@
   <div class="ai-sidebar" id="aiSidebar" role="complementary" aria-label="AI corrections and settings">
     <!-- Corrections (collapsible) -->
     <div class="corrections-compact">
-      <button type="button" class="corrections-compact-header" onclick="toggleCorrections()" aria-expanded="false" aria-controls="correctionList">
+      <button type="button" class="corrections-compact-header" data-click="toggleCorrections" aria-expanded="false" aria-controls="correctionList">
         <span class="ai-section-title corrections-title">CORRECTIONS</span>
         <span class="corrections-count" id="correctionCount">0</span>
       </button>
@@ -283,7 +284,7 @@
   <!-- FOOTER -->
   <footer>
     <div class="footer-row-1">
-      <button class="btn-mic" id="btnMic" onclick="toggleRecording()">
+      <button class="btn-mic" id="btnMic" data-click="toggleRecording">
         <svg aria-hidden="true" class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -292,18 +293,18 @@
         </svg>
         <span id="btnLabel">START</span>
       </button>
-      <button class="btn-secondary" id="btnProcess" onclick="doProcess()" style="display:none" title="Send accumulated text to cloud AI for correction">PROCESS</button>
-      <button class="btn-secondary" id="btnStructure" onclick="doStructure()">STRUCTURE</button>
-      <button class="btn-secondary" onclick="clearAll()">CLEAR</button>
-      <button class="btn-secondary" id="btnAI" onclick="toggleAIPanel()">CORRECTIONS</button>
+      <button class="btn-secondary" id="btnProcess" data-click="doProcess" hidden title="Send accumulated text to cloud AI for correction">PROCESS</button>
+      <button class="btn-secondary" id="btnStructure" data-click="doStructure">STRUCTURE</button>
+      <button class="btn-secondary" data-click="clearAll">CLEAR</button>
+      <button class="btn-secondary" id="btnAI" data-click="toggleAIPanel">CORRECTIONS</button>
 
       <div class="more-group">
-        <button class="btn-secondary" id="btnMore" onclick="toggleMoreMenu()" aria-haspopup="true" aria-expanded="false">MORE &#9662;</button>
+        <button class="btn-secondary" id="btnMore" data-click="toggleMoreMenu" aria-haspopup="true" aria-expanded="false">MORE &#9662;</button>
         <div class="copy-dropdown more-dropdown" id="moreDropdown">
-          <button class="copy-option" onclick="toggleCmdPanel(); closeMoreMenu()">Voice Commands</button>
-          <button class="copy-option" id="btnReadBack" onclick="toggleReadBack(); closeMoreMenu()" title="Automatically read back each sentence as you dictate">Read Back</button>
-          <button class="copy-option" onclick="toggleTimeline(); closeMoreMenu()">Timeline</button>
-          <button class="copy-option" onclick="showAnalytics(); closeMoreMenu()">Analytics</button>
+          <button class="copy-option" data-click="toggleCmdPanel closeMoreMenu">Voice Commands</button>
+          <button class="copy-option" id="btnReadBack" data-click="toggleReadBack closeMoreMenu" title="Automatically read back each sentence as you dictate">Read Back</button>
+          <button class="copy-option" data-click="toggleTimeline closeMoreMenu">Timeline</button>
+          <button class="copy-option" data-click="showAnalytics closeMoreMenu">Analytics</button>
         </div>
       </div>
 
@@ -314,19 +315,19 @@
           <div class="toggle-thumb"></div>
         </label>
         <div class="ai-mode-switch" id="aiModeSwitch">
-          <button class="ai-mode-btn active" data-mode="local" onclick="setAIMode('local')">LOCAL</button>
-          <button class="ai-mode-btn" data-mode="cloud" onclick="setAIMode('cloud')">CLOUD</button>
+          <button class="ai-mode-btn active" data-mode="local" data-click="setAIMode" data-arg="local">LOCAL</button>
+          <button class="ai-mode-btn" data-mode="cloud" data-click="setAIMode" data-arg="cloud">CLOUD</button>
         </div>
       </div>
 
       <div class="copy-group">
-        <button class="btn-copy" id="btnCopy" onclick="copyRefined()">COPY</button>
-        <button class="btn-copy-menu" onclick="toggleCopyMenu()" aria-label="Copy options" aria-haspopup="true" aria-expanded="false">&#9662;</button>
+        <button class="btn-copy" id="btnCopy" data-click="copyRefined">COPY</button>
+        <button class="btn-copy-menu" data-click="toggleCopyMenu" aria-label="Copy options" aria-haspopup="true" aria-expanded="false">&#9662;</button>
         <div class="copy-dropdown" id="copyDropdown">
-          <button class="copy-option" onclick="copyRaw()">Copy Raw</button>
-          <button class="copy-option" onclick="copyRefined()">Copy Refined</button>
-          <button class="copy-option" onclick="copyStructured()">Copy Structured</button>
-          <button class="copy-option" onclick="copyToClaude()">Copy to Claude Code</button>
+          <button class="copy-option" data-click="copyRaw">Copy Raw</button>
+          <button class="copy-option" data-click="copyRefined">Copy Refined</button>
+          <button class="copy-option" data-click="copyStructured">Copy Structured</button>
+          <button class="copy-option" data-click="copyToClaude">Copy to Claude Code</button>
         </div>
       </div>
     </div>
@@ -345,7 +346,7 @@
 </div>
 
 <!-- ══════ Folder Browser Modal ══════ -->
-<div class="folder-modal-overlay" id="folderModal" style="display:none">
+<div class="folder-modal-overlay" id="folderModal" hidden>
   <div class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
     <div class="folder-modal-header">
       <span class="folder-modal-title" id="folderModalTitle">SELECT PROJECTS FOLDER</span>
@@ -356,14 +357,14 @@
     <div class="folder-modal-list" id="browserList"></div>
     <div class="folder-modal-footer">
       <button class="btn-secondary" id="btnBrowserCancel">CANCEL</button>
-      <button class="btn-mic" id="btnBrowserSelect" style="padding:8px 24px;font-size:0.75rem">
+      <button class="btn-mic" id="btnBrowserSelect">
         <span>USE THIS FOLDER</span>
       </button>
     </div>
   </div>
 </div>
 
-<input type="file" id="importFileInput" accept=".json" style="display:none">
+<input type="file" id="importFileInput" accept=".json" hidden>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,124 @@
+/* Component styles that used to be inline style="" attributes or an inline <style> block.
+   The CSP forbids inline styles, so they live here. Loaded last so these rules keep the
+   precedence the inline styles had. */
+
+/* `hidden` must win over component display rules (e.g. .tts-bar, .folder-modal-overlay). */
+[hidden] { display: none !important; }
+
+/* ── Main screen ── */
+.ghost-text {
+  color: var(--dim);
+  opacity: 0.45;
+  font-style: italic;
+  pointer-events: none;
+}
+.typing-detected {
+  border-color: var(--warning) !important;
+}
+#btnBrowserSelect { padding: 8px 24px; font-size: 0.75rem; }
+.folder-item.folder-item-empty { color: var(--muted); cursor: default; }
+.text-dim { color: var(--dim); }
+
+/* ── Not supported screen ── */
+.not-supported {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--danger);
+  text-align: center;
+}
+.not-supported-title { font-family: var(--display); font-size: 2.5rem; letter-spacing: .1em; }
+.not-supported-text { color: var(--muted); font-size: .85rem; max-width: 400px; line-height: 1.7; }
+
+/* ── Shared modal pieces ── */
+.folder-modal-title.title-ai { color: var(--ai-glow); }
+.ai-settings-label.label-spaced { margin-top: 16px; }
+.ai-settings-label.label-spaced-sm { margin-top: 8px; }
+
+/* ── Local server setup modal ── */
+.folder-modal.server-setup-modal { width: 480px; }
+.server-setup-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.server-setup-intro { font-family: var(--body); font-size: 0.82rem; color: var(--text); line-height: 1.6; }
+.server-setup-em { color: var(--accent2); }
+.server-setup-code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.8;
+  color: var(--accent);
+}
+.server-setup-comment { color: var(--dim); margin-bottom: 6px; }
+.server-setup-gap { margin-top: 8px; }
+.server-setup-comment.server-setup-gap { margin-bottom: 0; }
+.server-setup-note { font-family: var(--body); font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+.server-setup-link { color: var(--ai-glow); }
+.server-setup-code-inline { color: var(--accent); font-family: var(--mono); font-size: 0.7rem; }
+
+/* ── AI provider settings modal ── */
+.folder-modal.ai-settings-modal { max-width: 520px; min-height: 380px; display: flex; flex-direction: column; }
+#aiSettingsBody { flex: 1; padding: 16px; overflow-y: auto; }
+#aiSettingsTestBtn { margin-right: auto; padding: 6px 16px; font-size: 0.7rem; }
+#aiSettingsCancelBtn { padding: 6px 16px; font-size: 0.7rem; }
+#aiSettingsSaveBtn { padding: 8px 24px; font-size: 0.75rem; }
+#aiSettingsApiKey { flex: 1; }
+.ai-settings-empty { color: var(--dim); font-size: 0.75rem; }
+
+/* ── Gemini setup wizard ── */
+.folder-modal.gemini-wizard-modal { max-width: 460px; display: flex; flex-direction: column; }
+.gw-desc.gw-desc-left { text-align: left; }
+#gwApiKey { flex: 1; }
+
+/* ── Search sessions modal ── */
+.folder-modal.search-modal { max-width: 580px; min-height: 420px; }
+
+/* ── Command builder ── */
+.btn-secondary.cmd-builder-save-btn { border-color: var(--accent2); color: var(--accent2); }
+
+/* ── Timeline legend ── */
+.tl-dot.tl-dot-speech { background: var(--success); }
+.tl-dot.tl-dot-command { background: var(--accent2); }
+.tl-dot.tl-dot-correction { background: var(--ai-glow); }
+.tl-dot.tl-dot-structure { background: var(--warning); }
+
+/* ── Onboarding wizard ── */
+#owTitle { color: var(--accent); }
+.ow-desc.ow-gap-16 { margin-bottom: 16px; }
+.ow-desc.ow-gap-20 { margin-bottom: 20px; }
+.ow-desc.ow-desc-left { text-align: left; }
+.ow-desc.ow-note { margin-top: 16px; font-size: 0.75rem; }
+.ow-desc.ow-tip { margin-top: 10px; font-size: 0.75rem; color: var(--accent2); }
+.ow-desc .ow-tip-label { color: var(--accent2); }
+#owModelSelect { width: 100%; }
+.ow-checklist.ow-checklist-spaced { margin: 16px 0; }
+.ow-status.ow-status-spaced { margin-top: 12px; }
+.ow-btn-row { display: flex; gap: 8px; }
+.ow-btn-row.ow-btn-row-center { align-items: center; }
+#owSkipLocal { opacity: 0.6; }
+#owSkipCloud { font-size: 0.68rem; }
+#owSkipKey { opacity: 0.6; font-size: 0.68rem; }
+.ow-link { color: var(--accent); }
+.ow-compare-head.ow-compare-local { color: var(--success); }
+.ow-compare-head.ow-compare-cloud { color: var(--ai-glow); }
+.ow-field.ow-field-spaced { margin-top: 16px; }
+.ai-settings-checkbox-row.ow-checkbox-spaced { margin-top: 8px; }
+#owApiKey { flex: 1; }
+
+/* ── Diagrams ── */
+.diagram-wrapper { padding: 16px; overflow: auto; text-align: center; }
+.diagram-error { color: var(--danger); font-family: var(--mono); font-size: 0.75rem; padding: 16px; }
+.diagram-error-title { margin-bottom: 8px; font-weight: 600; }
+.diagram-error-message { margin-bottom: 12px; color: var(--muted); }
+.diagram-error-source {
+  color: var(--dim);
+  white-space: pre-wrap;
+  background: var(--surface);
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}

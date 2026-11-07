@@ -47,6 +47,48 @@ function _setProjectsRoot(p) {
   return [true, resolved];
 }
 
+// Ollama base URL chosen in AI settings. Stored as an origin; also allowed in the CSP.
+// An origin safe to place in a CSP header: no spaces, ';', ',' or quotes can get through.
+const OLLAMA_ORIGIN = /^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/;
+
+function _ollamaOrigin(value) {
+  let url;
+  try { url = new URL(value); } catch { return null; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.username || url.password) return null;
+  const match = OLLAMA_ORIGIN.exec(url.origin);
+  if (!match) return null;
+  if (match[2] && !(+match[2].slice(1) >= 1 && +match[2].slice(1) <= 65535)) return null;
+  return url.origin;
+}
+
+// The saved origin is re-validated on every read; an invalid stored value is dropped.
+function _getOllamaUrl() {
+  const cfg = _loadConfig();
+  if (cfg.ollamaUrl === undefined) return null;
+  const origin = typeof cfg.ollamaUrl === 'string' ? _ollamaOrigin(cfg.ollamaUrl) : null;
+  if (origin !== cfg.ollamaUrl) {
+    if (origin) cfg.ollamaUrl = origin;
+    else delete cfg.ollamaUrl;
+    _saveConfig(cfg);
+  }
+  return origin;
+}
+
+function _setOllamaUrl(value) {
+  const cfg = _loadConfig();
+  if (!value) {
+    delete cfg.ollamaUrl;
+    _saveConfig(cfg);
+    return [true, null];
+  }
+  const origin = _ollamaOrigin(value);
+  if (!origin) return [false, 'Ollama URL must be an http(s) URL'];
+  cfg.ollamaUrl = origin;
+  _saveConfig(cfg);
+  return [true, origin];
+}
+
 // ---------------------------------------------------------------------------
 // Rate limiter (30 req / 60 s per IP)
 // ---------------------------------------------------------------------------
@@ -131,7 +173,11 @@ function _getProjects() {
 }
 
 function _scanProject(name) {
-  const root = path.join(_getProjectsRoot(), name);
+  const projectsRoot = path.resolve(_getProjectsRoot());
+  const root = path.resolve(projectsRoot, name);
+  // Containment check: reject names like '../secret' that escape the projects root.
+  const rel = path.relative(projectsRoot, root);
+  if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) return { name, stack: '', files: [] };
   if (!fs.existsSync(root)) return { name, stack: '', files: [] };
   const files = [];
   function walk(dir, depth) {
@@ -286,10 +332,14 @@ async function _proxyRequest(provider, apiKey, model, prompt, systemPrompt, stre
     });
   } else if (provider === 'google') {
     const geminiModel = model || 'gemini-2.5-flash';
+    if (!MODEL_ID.test(geminiModel)) {
+      res.status(400).json({ error: 'Invalid model' });
+      return;
+    }
     url = new URL(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
     );
-    headers = { 'Content-Type': 'application/json' };
+    headers = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
     bodyStr = JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -388,9 +438,9 @@ async function _listAnthropicModels(apiKey) {
 async function _listGoogleModels(apiKey) {
   const upstream = await _httpsRequest({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    path: '/v1beta/models',
     method: 'GET',
-    headers: {},
+    headers: { 'x-goog-api-key': apiKey },
   }, '');
   const chunks = [];
   upstream.on('data', c => chunks.push(c));
@@ -403,6 +453,35 @@ async function _listGoogleModels(apiKey) {
 // ---------------------------------------------------------------------------
 // Express app
 // ---------------------------------------------------------------------------
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+let _appOrigins = new Set();
+
+// Scripts: own files plus the pinned Mermaid build (js/ui/diagram-renderer.js, loaded with SRI).
+// Connect: the app's own API, local Ollama on any localhost port, and the Ollama URL saved in
+// AI settings (if any). index.html carries a static meta CSP for GitHub Pages; it is removed
+// when served from here, since this header is the policy for the desktop app.
+function _csp() {
+  const saved = _getOllamaUrl();
+  const connect = ["'self'", 'http://localhost:*', 'http://127.0.0.1:*'];
+  if (saved) connect.push(saved);
+  return [
+    "default-src 'self'",
+    "script-src 'self' https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js",
+    "style-src 'self' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    `connect-src ${connect.join(' ')}`,
+    "media-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+
+const META_CSP = /<meta http-equiv="Content-Security-Policy"[^>]*>\r?\n?/;
 
 function _buildApp(staticRoot) {
   const app = express();
@@ -423,6 +502,20 @@ function _buildApp(staticRoot) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', _csp());
+    next();
+  });
+
+  // State-changing API calls must come from the app's own origin. Browsers always
+  // send Origin on POST, so a cross-site page is rejected; local non-browser
+  // clients send no Origin and are allowed, as before.
+  app.use('/api', (req, res, next) => {
+    if (SAFE_METHODS.has(req.method)) { next(); return; }
+    const origin = req.get('origin');
+    if (origin !== undefined && !_appOrigins.has(origin)) {
+      res.status(403).json({ error: 'Forbidden origin' });
+      return;
+    }
     next();
   });
 
@@ -446,6 +539,22 @@ function _buildApp(staticRoot) {
     const [ok, msg] = _setProjectsRoot(p);
     if (ok) res.json({ path: msg });
     else res.status(400).json({ error: msg });
+  });
+
+  // --- Ollama URL (persisted; also widens connect-src on the next page load) ---
+  app.get('/api/ollama-url', (req, res) => {
+    res.json({ url: _getOllamaUrl() });
+  });
+
+  app.post('/api/ollama-url', (req, res) => {
+    const { url } = req.body || {};
+    if (url !== undefined && url !== null && typeof url !== 'string') {
+      res.status(400).json({ error: 'url must be a string' });
+      return;
+    }
+    const [ok, value] = _setOllamaUrl(url ? url.trim() : '');
+    if (ok) res.json({ url: value });
+    else res.status(400).json({ error: value });
   });
 
   // --- Browse ---
@@ -501,12 +610,14 @@ function _buildApp(staticRoot) {
     }
   });
 
-  // --- Static files (the web app) ---
-  app.use(express.static(staticRoot));
+  // --- Static files (the web app): only the page, its scripts and its styles ---
+  app.use('/js', express.static(path.join(staticRoot, 'js'), { index: false }));
+  app.use('/css', express.static(path.join(staticRoot, 'css'), { index: false }));
 
-  // Fallback: serve index.html for any unmatched route
+  // index.html for any other GET, without the GitHub Pages meta CSP (the header applies here)
   app.get('*', (req, res) => {
-    res.sendFile(path.join(staticRoot, 'index.html'));
+    const html = fs.readFileSync(path.join(staticRoot, 'index.html'), 'utf8');
+    res.type('html').send(html.replace(META_CSP, ''));
   });
 
   return app;
@@ -518,16 +629,17 @@ function _buildApp(staticRoot) {
 
 function startServer(port, electronApp) {
   _electronApp = electronApp || null;
+  _appOrigins = new Set([`http://localhost:${port}`, `http://127.0.0.1:${port}`]);
   const staticRoot = path.join(__dirname, '..');
   const app = _buildApp(staticRoot);
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, '127.0.0.1', () => {
-      console.log(`FiavaionDictate server listening on http://localhost:${port}`);
+      console.log(`FiavaionDictate server listening on http://localhost:${server.address().port}`);
       resolve(server);
     });
     server.on('error', reject);
   });
 }
 
-module.exports = { startServer };
+module.exports = { startServer, ollamaOrigin: _ollamaOrigin };

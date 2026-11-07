@@ -5,7 +5,18 @@ const path = require('path');
 const { startServer } = require('./server');
 
 const PORT = 3001;
+const APP_ORIGINS = new Set([`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`]);
 let mainWindow;
+
+function isAppUrl(url) {
+  try { return APP_ORIGINS.has(new URL(url).origin); }
+  catch { return false; }
+}
+
+function openExternalIfHttp(url) {
+  // Only hand http(s) URLs to the OS shell; deny file:, data:, etc.
+  if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+}
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); process.exit(0); }
@@ -16,9 +27,7 @@ app.on('second-instance', () => {
 
 async function createWindow() {
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const url = webContents.getURL();
-    if ((permission === 'media' || permission === 'microphone') &&
-        (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1'))) {
+    if ((permission === 'media' || permission === 'microphone') && isAppUrl(webContents.getURL())) {
       return callback(true);
     }
     callback(false);
@@ -42,14 +51,20 @@ async function createWindow() {
 
   Menu.setApplicationMenu(null);
 
-  await startServer(PORT, app);
-  mainWindow.loadURL(`http://localhost:${PORT}`);
-
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Only hand http(s) URLs to the OS shell; deny file:, data:, etc.
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    openExternalIfHttp(url);
     return { action: 'deny' };
   });
+
+  // Keep the app window on the local app; send any other destination to the OS browser.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    openExternalIfHttp(url);
+  });
+
+  await startServer(PORT, app);
+  mainWindow.loadURL(`http://localhost:${PORT}`);
 
   mainWindow.on('closed', () => { mainWindow = null; });
 }

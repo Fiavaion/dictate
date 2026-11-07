@@ -36,7 +36,6 @@ const CHART_PALETTE = [
 export class AnalyticsDashboard {
   constructor() {
     this._el = null;
-    this._stylesInjected = false;
   }
 
   // ───────────────────────────────────
@@ -50,7 +49,6 @@ export class AnalyticsDashboard {
    */
   open(sessionsIndex = [], correctionLearnerStats = null) {
     this.close();  // remove any existing instance
-    this._injectStyles();
 
     this._sessionsIndex = sessionsIndex;
     this._learnerStats = correctionLearnerStats;
@@ -170,9 +168,10 @@ export class AnalyticsDashboard {
     const card = document.createElement('div');
     card.className = 'analytics-card';
     card.innerHTML = `
-      <div class="analytics-card-value" style="color: ${color}">${value}</div>
+      <div class="analytics-card-value">${value}</div>
       <div class="analytics-card-label">${label}</div>
     `;
+    card.querySelector('.analytics-card-value').style.color = color;
     return card;
   }
 
@@ -596,237 +595,5 @@ export class AnalyticsDashboard {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-  }
-
-  /** Inject scoped CSS styles for the dashboard (once) */
-  _injectStyles() {
-    if (this._stylesInjected) return;
-    this._stylesInjected = true;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      /* ── Analytics Dashboard Overlay ── */
-      .analytics-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.75);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(4px);
-      }
-
-      .analytics-modal {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        width: 800px;
-        max-width: 94vw;
-        max-height: 90vh;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-        overflow: hidden;
-      }
-
-      .analytics-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 20px 10px;
-        border-bottom: 1px solid var(--border);
-        flex-shrink: 0;
-      }
-
-      .analytics-title {
-        font-family: var(--mono);
-        font-size: 0.7rem;
-        letter-spacing: 0.2em;
-        color: var(--ai-glow);
-      }
-
-      .analytics-close {
-        background: none;
-        border: none;
-        color: var(--muted);
-        font-size: 1.4rem;
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-        transition: color 0.2s;
-      }
-      .analytics-close:hover { color: var(--text); }
-
-      .analytics-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 28px;
-        scrollbar-width: thin;
-        scrollbar-color: var(--border) transparent;
-      }
-      .analytics-body::-webkit-scrollbar { width: 4px; }
-      .analytics-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-      /* ── Sections ── */
-      .analytics-section {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .analytics-section-title {
-        font-family: var(--mono);
-        font-size: 0.55rem;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: var(--ai-glow);
-        padding-bottom: 6px;
-        border-bottom: 1px solid var(--border);
-      }
-
-      /* ── Summary Cards ── */
-      .analytics-cards {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .analytics-card {
-        flex: 1 1 120px;
-        min-width: 100px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 14px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .analytics-card-value {
-        font-family: var(--mono);
-        font-size: 1.3rem;
-        font-weight: 700;
-        line-height: 1;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .analytics-card-label {
-        font-family: var(--mono);
-        font-size: 0.52rem;
-        letter-spacing: 0.15em;
-        text-transform: uppercase;
-        color: var(--dim);
-      }
-
-      /* ── SVG Charts ── */
-      .analytics-chart-svg {
-        width: 100%;
-        height: auto;
-        max-height: 300px;
-      }
-      .analytics-chart-donut {
-        max-height: 180px;
-      }
-
-      /* ── Mishearings Table ── */
-      .analytics-mishearing-summary {
-        font-family: var(--mono);
-        font-size: 0.65rem;
-        color: var(--muted);
-        letter-spacing: 0.05em;
-      }
-
-      .analytics-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: var(--mono);
-        font-size: 0.72rem;
-      }
-
-      .analytics-table th {
-        text-align: left;
-        font-size: 0.55rem;
-        letter-spacing: 0.15em;
-        text-transform: uppercase;
-        color: var(--dim);
-        padding: 6px 10px;
-        border-bottom: 1px solid var(--border);
-        font-weight: 400;
-      }
-
-      .analytics-table td {
-        padding: 6px 10px;
-        border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-        color: var(--text);
-      }
-
-      .analytics-cell-misheard {
-        color: var(--danger);
-        text-decoration: line-through;
-        opacity: 0.75;
-      }
-
-      .analytics-cell-correct {
-        color: var(--accent2);
-      }
-
-      .analytics-cell-count {
-        color: var(--text);
-        font-variant-numeric: tabular-nums;
-        text-align: center;
-      }
-
-      .analytics-status-promoted {
-        font-size: 0.55rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--accent);
-        background: color-mix(in srgb, var(--accent) 12%, transparent);
-        padding: 2px 6px;
-        border-radius: 3px;
-      }
-
-      .analytics-status-pending {
-        font-size: 0.55rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--dim);
-        background: color-mix(in srgb, var(--dim) 12%, transparent);
-        padding: 2px 6px;
-        border-radius: 3px;
-      }
-
-      /* ── Empty state ── */
-      .analytics-empty {
-        font-family: var(--body);
-        font-size: 0.8rem;
-        color: var(--dim);
-        font-style: italic;
-        padding: 16px 0;
-      }
-
-      /* ── Responsive ── */
-      @media (max-width: 600px) {
-        .analytics-modal {
-          max-width: 100vw;
-          max-height: 100vh;
-          border-radius: 0;
-          width: 100%;
-          height: 100%;
-        }
-        .analytics-cards {
-          flex-direction: column;
-        }
-        .analytics-card {
-          flex: 1 1 auto;
-        }
-      }
-    `;
-    document.head.appendChild(style);
   }
 }

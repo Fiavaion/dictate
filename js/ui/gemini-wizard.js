@@ -42,9 +42,9 @@ export class GeminiWizard {
     });
 
     overlay.innerHTML = `
-      <div class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="gwTitle" style="max-width:460px;display:flex;flex-direction:column">
+      <div class="folder-modal gemini-wizard-modal" role="dialog" aria-modal="true" aria-labelledby="gwTitle">
         <div class="folder-modal-header">
-          <span class="folder-modal-title" id="gwTitle" style="color:var(--ai-glow)">GEMINI SETUP</span>
+          <span class="folder-modal-title title-ai" id="gwTitle">GEMINI SETUP</span>
           <div class="gw-dots" id="gwDots"></div>
           <button class="folder-modal-close" id="gwClose">&times;</button>
         </div>
@@ -56,7 +56,6 @@ export class GeminiWizard {
     document.body.appendChild(overlay);
     this._el = overlay;
     this._el.querySelector('#gwClose').onclick = () => this.close();
-    this._injectStyles();
   }
 
   _renderStep() {
@@ -111,7 +110,7 @@ export class GeminiWizard {
   _step2(body, actions) {
     body.innerHTML = `
       <div class="gw-title">Create Your API Key</div>
-      <div class="gw-desc" style="text-align:left">
+      <div class="gw-desc gw-desc-left">
         <div class="gw-instruction"><span class="gw-num">1</span> Click the button below to open Google AI Studio</div>
         <div class="gw-instruction"><span class="gw-num">2</span> Sign in with your Google account</div>
         <div class="gw-instruction"><span class="gw-num">3</span> Click <strong>Create API Key</strong></div>
@@ -140,7 +139,7 @@ export class GeminiWizard {
     body.innerHTML = `
       <div class="gw-title">Paste Your API Key</div>
       <div class="gw-key-row">
-        <input class="ai-settings-input" id="gwApiKey" type="password" value="${gwEsc(existing)}" placeholder="AIza..." style="flex:1">
+        <input class="ai-settings-input" id="gwApiKey" type="password" value="${gwEsc(existing)}" placeholder="AIza...">
         <button class="ai-settings-eye" id="gwEye" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -225,7 +224,7 @@ export class GeminiWizard {
         Gemini is now your cloud AI provider. Your dictation will be
         cleaned up by Google's AI.
       </div>
-      <label class="ai-settings-label" style="margin-top:8px">Model</label>
+      <label class="ai-settings-label label-spaced-sm">Model</label>
       <select class="ai-settings-input" id="gwModel">${opts}</select>
     `;
     actions.innerHTML = `
@@ -250,117 +249,5 @@ export class GeminiWizard {
     if (!el) return;
     el.textContent = text;
     el.style.color = color;
-  }
-
-  _injectStyles() {
-    if (document.getElementById('gemini-wizard-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'gemini-wizard-styles';
-    style.textContent = `
-      .gw-body {
-        padding: 28px 24px 16px;
-        text-align: center;
-        min-height: 220px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      }
-      .gw-icon { margin-bottom: 16px; }
-      .gw-title {
-        font-family: var(--display);
-        font-size: 1.25rem;
-        color: var(--text);
-        margin-bottom: 12px;
-      }
-      .gw-desc {
-        font-family: var(--body);
-        font-size: 0.82rem;
-        color: var(--muted);
-        line-height: 1.7;
-        max-width: 360px;
-      }
-      .gw-desc strong { color: var(--ai-glow); }
-      .gw-dots {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-      .gw-dot {
-        width: 8px; height: 8px;
-        border-radius: 50%;
-        background: var(--border);
-        transition: all 0.3s;
-      }
-      .gw-dot.active {
-        background: var(--ai-glow);
-        box-shadow: 0 0 8px var(--ai-glow);
-      }
-      .gw-dot.done { background: var(--success); }
-      .gw-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 14px 20px;
-        border-top: 1px solid var(--border);
-      }
-      .gw-btn-next { padding: 8px 24px !important; font-size: 0.75rem !important; }
-      .gw-btn-back { padding: 6px 16px; font-size: 0.7rem; }
-      .gw-instruction {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 8px 0;
-        font-size: 0.82rem;
-        color: var(--text);
-      }
-      .gw-num {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px; height: 24px;
-        border-radius: 50%;
-        background: color-mix(in srgb, var(--ai-glow) 15%, var(--surface));
-        color: var(--ai-glow);
-        font-family: var(--mono);
-        font-size: 0.7rem;
-        font-weight: 700;
-        flex-shrink: 0;
-      }
-      .gw-link-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 20px;
-        padding: 10px 20px;
-        background: color-mix(in srgb, var(--ai-glow) 10%, var(--surface));
-        border: 1px solid var(--ai-glow);
-        border-radius: 6px;
-        color: var(--ai-glow);
-        font-family: var(--mono);
-        font-size: 0.72rem;
-        letter-spacing: 0.08em;
-        text-decoration: none;
-        transition: all 0.2s;
-      }
-      .gw-link-btn:hover {
-        background: color-mix(in srgb, var(--ai-glow) 20%, var(--surface));
-        box-shadow: 0 0 16px color-mix(in srgb, var(--ai-glow) 20%, transparent);
-      }
-      .gw-key-row {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        width: 100%;
-        max-width: 360px;
-      }
-      .gw-status {
-        margin-top: 16px;
-        font-family: var(--mono);
-        font-size: 0.72rem;
-        min-height: 1.2em;
-      }
-    `;
-    document.head.appendChild(style);
   }
 }

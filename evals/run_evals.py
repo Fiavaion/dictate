@@ -50,9 +50,9 @@ def call_gemini(system_prompt, user_text):
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 800},
     }).encode()
     req = urllib.request.Request(
-        f"{GEMINI_URL}?key={GEMINI_KEY}",
+        GEMINI_URL,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY},
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:

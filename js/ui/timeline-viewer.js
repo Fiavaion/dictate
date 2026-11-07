@@ -38,7 +38,6 @@ export class TimelineViewer {
     /** @type {function()|null} Called when export button is clicked */
     this.onExport = null;
 
-    this._stylesInjected = false;
   }
 
   /**
@@ -46,7 +45,6 @@ export class TimelineViewer {
    * @param {string} containerId  ID of the parent element
    */
   render(containerId) {
-    this._injectStyles();
 
     const container = document.getElementById(containerId);
     if (!container) {
@@ -61,7 +59,7 @@ export class TimelineViewer {
         <button class="tl-btn tl-play-btn" title="Play/Pause">
           <svg class="tl-icon" viewBox="0 0 16 16" fill="currentColor">
             <path class="tl-play-icon" d="M4 2l10 6-10 6z"/>
-            <path class="tl-pause-icon" d="M3 1h3v14H3zm7 0h3v14h-3z" style="display:none"/>
+            <path class="tl-pause-icon" d="M3 1h3v14H3zm7 0h3v14h-3z"/>
           </svg>
         </button>
         <button class="tl-btn tl-speed-btn" title="Playback speed">1x</button>
@@ -78,16 +76,17 @@ export class TimelineViewer {
         <div class="tl-scrub-handle" title="Drag to scrub"></div>
       </div>
       <div class="tl-legend">
-        <span class="tl-legend-item"><span class="tl-dot" style="background:var(--success)"></span>Speech</span>
-        <span class="tl-legend-item"><span class="tl-dot" style="background:var(--accent2)"></span>Command</span>
-        <span class="tl-legend-item"><span class="tl-dot" style="background:var(--ai-glow)"></span>Correction</span>
-        <span class="tl-legend-item"><span class="tl-dot" style="background:var(--warning)"></span>Structure</span>
+        <span class="tl-legend-item"><span class="tl-dot tl-dot-speech"></span>Speech</span>
+        <span class="tl-legend-item"><span class="tl-dot tl-dot-command"></span>Command</span>
+        <span class="tl-legend-item"><span class="tl-dot tl-dot-correction"></span>Correction</span>
+        <span class="tl-legend-item"><span class="tl-dot tl-dot-structure"></span>Structure</span>
       </div>
     `;
 
     container.appendChild(this._el);
 
     this._svg = this._el.querySelector('.tl-svg');
+    this._updatePlayPauseIcon();
     this._bindEvents();
     this.update();
   }
@@ -311,145 +310,5 @@ export class TimelineViewer {
     const pct = x / rect.width;
     const duration = this.timeline.getDuration() || 1;
     this.scrubTo(pct * duration);
-  }
-
-  // ──────────────────────────────────────────
-  // Styles
-  // ──────────────────────────────────────────
-
-  _injectStyles() {
-    if (this._stylesInjected) return;
-    this._stylesInjected = true;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Timeline panel */
-      .tl-panel {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 3px;
-        margin-top: 6px;
-        overflow: hidden;
-        transition: max-height 0.3s ease, opacity 0.3s ease;
-        max-height: 160px;
-        opacity: 1;
-      }
-      .tl-panel.tl-closed {
-        max-height: 0;
-        opacity: 0;
-        border-color: transparent;
-        margin-top: 0;
-      }
-
-      /* Controls row */
-      .tl-controls {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        border-bottom: 1px solid var(--border);
-      }
-      .tl-btn {
-        font-family: var(--mono);
-        font-size: 0.6rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--muted);
-        background: var(--panel);
-        border: 1px solid var(--border);
-        padding: 3px 8px;
-        border-radius: 3px;
-        cursor: pointer;
-        transition: all 0.2s;
-        line-height: 1;
-      }
-      .tl-btn:hover {
-        border-color: var(--ai-glow);
-        color: var(--ai-glow);
-      }
-      .tl-play-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 26px;
-        height: 26px;
-        padding: 0;
-      }
-      .tl-icon {
-        width: 12px;
-        height: 12px;
-      }
-      .tl-time {
-        font-family: var(--mono);
-        font-size: 0.62rem;
-        color: var(--muted);
-        letter-spacing: 0.05em;
-        font-variant-numeric: tabular-nums;
-      }
-      .tl-time-current { color: var(--text); }
-      .tl-time-sep { color: var(--dim); margin: 0 2px; }
-      .tl-spacer { flex: 1; }
-
-      /* Track area */
-      .tl-track-wrap {
-        position: relative;
-        height: 32px;
-        padding: 0 10px;
-        cursor: pointer;
-        user-select: none;
-      }
-      .tl-svg {
-        width: 100%;
-        height: 100%;
-        display: block;
-      }
-      .tl-scrub-handle {
-        position: absolute;
-        top: 4px;
-        bottom: 4px;
-        width: 2px;
-        background: var(--accent);
-        border-radius: 1px;
-        left: 10px;
-        pointer-events: none;
-        transition: left 0.05s linear;
-        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 40%, transparent);
-      }
-      .tl-scrub-handle::before {
-        content: '';
-        position: absolute;
-        top: -3px;
-        left: -3px;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--accent);
-      }
-
-      /* Legend */
-      .tl-legend {
-        display: flex;
-        gap: 12px;
-        padding: 4px 10px 6px;
-        flex-wrap: wrap;
-      }
-      .tl-legend-item {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-family: var(--mono);
-        font-size: 0.5rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--dim);
-      }
-      .tl-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-    `;
-    document.head.appendChild(style);
   }
 }

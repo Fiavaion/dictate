@@ -3,6 +3,7 @@
  * Orchestrates STT, AI correction, prompt structuring, and UI.
  */
 
+import './ui/dom-actions.js';
 import { WebSpeechEngine } from './stt/web-speech-engine.js';
 import { AutoPunctuation } from './stt/auto-punctuation.js';
 import { VocabularyManager } from './stt/vocabulary-manager.js';
@@ -96,13 +97,13 @@ async function loadProjectsRoot() {
 
 async function openFolderBrowser() {
   state.folderModalOpener = document.activeElement; // restore focus here on close
-  $('folderModal').style.display = 'flex';
+  $('folderModal').hidden = false;
   $('btnCloseBrowser')?.focus();                    // move focus into the dialog (WCAG 2.4.3)
   await browseTo(currentProjectsRoot || null);
 }
 
 function closeFolderBrowser() {
-  $('folderModal').style.display = 'none';
+  $('folderModal').hidden = true;
   state.folderModalOpener?.focus?.();               // return focus to the trigger
   state.folderModalOpener = null;
 }
@@ -169,7 +170,7 @@ async function browseTo(path) {
     }
 
     if (data.dirs.length === 0 && !data.parent) {
-      listEl.innerHTML = '<div class="folder-item" style="color:var(--muted);cursor:default">No subdirectories</div>';
+      listEl.innerHTML = '<div class="folder-item folder-item-empty">No subdirectories</div>';
     }
   } catch {
     flashCmd('ERROR: SERVER UNAVAILABLE');
@@ -437,7 +438,7 @@ speakAsYouType.onSpeechStart = (sentence) => {
   }
   html += '</span>';
   bar.innerHTML = html;
-  bar.style.display = 'flex';
+  bar.hidden = false;
 };
 
 speakAsYouType.onWordBoundary = (_word, charIndex) => {
@@ -454,7 +455,7 @@ speakAsYouType.onWordBoundary = (_word, charIndex) => {
 
 speakAsYouType.onSpeechEnd = () => {
   const bar = $('ttsBar');
-  if (bar) bar.style.display = 'none';
+  if (bar) bar.hidden = true;
 };
 
 const promptStructurer = new PromptStructurer(aiClient, {
@@ -1612,9 +1613,9 @@ async function transformSelection(instruction) {
 // Not Supported
 // ══════════════════════════════════════════
 function showNotSupported() {
-  $('app').innerHTML = `<div style="grid-row:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--danger);text-align:center">
-    <h2 style="font-family:var(--display);font-size:2.5rem;letter-spacing:.1em">NOT SUPPORTED</h2>
-    <p style="color:var(--muted);font-size:.85rem;max-width:400px;line-height:1.7">Web Speech API unavailable.<br>Please use <strong>Chrome</strong> or <strong>Edge</strong>.</p>
+  $('app').innerHTML = `<div class="not-supported">
+    <h2 class="not-supported-title">NOT SUPPORTED</h2>
+    <p class="not-supported-text">Web Speech API unavailable.<br>Please use <strong>Chrome</strong> or <strong>Edge</strong>.</p>
   </div>`;
 }
 
@@ -1627,6 +1628,60 @@ $('langSelect').addEventListener('change', () => {
 });
 
 // ══════════════════════════════════════════
+// Saved Ollama URL
+// ══════════════════════════════════════════
+// The local server stores the Ollama URL and allows its origin in the page's CSP
+// (connect-src). The CSP is fixed when the page loads, so a newly saved remote
+// origin needs a reload; the session is autosaved and restored, so nothing is lost.
+let ollamaOriginAtLoad = null;
+
+// Same rule as both servers: only a plain http(s) origin (it ends up in the CSP header).
+const OLLAMA_ORIGIN = /^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/;
+
+function toOllamaOrigin(value) {
+  let url;
+  try { url = new URL(value); } catch { return null; }
+  if (url.username || url.password) return null;
+  const match = OLLAMA_ORIGIN.exec(url.origin);
+  if (!match) return null;
+  if (match[2] && !(+match[2].slice(1) >= 1 && +match[2].slice(1) <= 65535)) return null;
+  return url.origin;
+}
+
+async function loadSavedOllamaUrl() {
+  try {
+    const res = await fetch('/api/ollama-url');
+    if (!res.ok) return;
+    const url = toOllamaOrigin((await res.json()).url);
+    ollamaOriginAtLoad = url;
+    if (url && url !== aiClient.getOllamaBaseUrl()) {
+      aiClient.setOllamaBaseUrl(url);
+      _refreshAIConnection();
+    }
+  } catch { /* keep the default URL */ }
+}
+
+async function saveOllamaUrl(value) {
+  const url = value ? toOllamaOrigin(value) : null;
+  if (value && !url) { flashCmd('OLLAMA URL NOT SAVED: MUST BE AN HTTP(S) URL'); return; }
+  try {
+    const res = await fetch('/api/ollama-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) { flashCmd('OLLAMA URL NOT SAVED: ' + (data.error || res.status)); return; }
+    if (!data.url) return; // cleared: the default local URL needs no reload
+    const host = new URL(data.url).hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    if (!isLocal && data.url !== ollamaOriginAtLoad) window.location.reload();
+  } catch {
+    flashCmd('OLLAMA URL NOT SAVED');
+  }
+}
+
+// ══════════════════════════════════════════
 // Server mode detection
 // ══════════════════════════════════════════
 async function detectServerMode() {
@@ -1634,6 +1689,7 @@ async function detectServerMode() {
     const res = await fetch('/api/projects-root');
     if (res.ok) {
       state.serverAvailable = true;
+      await loadSavedOllamaUrl();
       return;
     }
   } catch { /* server not running */ }
@@ -1656,36 +1712,37 @@ function showServerSetup() {
   modal.id = 'serverModal';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div class="folder-modal" style="width:480px">
+    <div class="folder-modal server-setup-modal">
       <div class="folder-modal-header">
         <span class="folder-modal-title">LOCAL SERVER SETUP</span>
-        <button class="folder-modal-close" onclick="document.getElementById('serverModal').remove()">&times;</button>
+        <button class="folder-modal-close" data-close-modal>&times;</button>
       </div>
-      <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
-        <p style="font-family:var(--body);font-size:0.82rem;color:var(--text);line-height:1.6">
-          The local server enables <strong style="color:var(--accent2)">project management</strong>,
-          <strong style="color:var(--accent2)">folder browsing</strong>, and
-          <strong style="color:var(--accent2)">AI correction via Ollama</strong>.
+      <div class="server-setup-body">
+        <p class="server-setup-intro">
+          The local server enables <strong class="server-setup-em">project management</strong>,
+          <strong class="server-setup-em">folder browsing</strong>, and
+          <strong class="server-setup-em">AI correction via Ollama</strong>.
           Dictation works without it.
         </p>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:0.75rem;line-height:1.8;color:var(--accent)">
-          <div style="color:var(--dim);margin-bottom:6px"># 1. Install Python 3.8+</div>
-          <div style="color:var(--dim);margin-bottom:6px"># 2. Clone the repo</div>
+        <div class="server-setup-code">
+          <div class="server-setup-comment"># 1. Install Python 3.8+</div>
+          <div class="server-setup-comment"># 2. Clone the repo</div>
           <div>git clone https://github.com/Fiavaion/dictate.git</div>
           <div>cd dictate</div>
-          <div style="margin-top:8px">python server.py</div>
-          <div style="color:var(--dim);margin-top:8px"># Then open http://localhost:31000</div>
+          <div class="server-setup-gap">python server.py</div>
+          <div class="server-setup-comment server-setup-gap"># Then open http://localhost:31000</div>
         </div>
-        <p style="font-family:var(--body);font-size:0.72rem;color:var(--muted);line-height:1.5">
-          For AI features, also install <a href="https://ollama.com" target="_blank" style="color:var(--ai-glow)">Ollama</a> and pull a model:<br>
-          <code style="color:var(--accent);font-family:var(--mono);font-size:0.7rem">ollama pull gemma3:4b</code>
+        <p class="server-setup-note">
+          For AI features, also install <a href="https://ollama.com" target="_blank" class="server-setup-link">Ollama</a> and pull a model:<br>
+          <code class="server-setup-code-inline">ollama pull gemma3:4b</code>
         </p>
       </div>
       <div class="folder-modal-footer">
-        <button class="btn-secondary" onclick="document.getElementById('serverModal').remove()">CLOSE</button>
+        <button class="btn-secondary" data-close-modal>CLOSE</button>
       </div>
     </div>
   `;
+  for (const btn of modal.querySelectorAll('[data-close-modal]')) btn.onclick = () => modal.remove();
   document.body.appendChild(modal);
 }
 window.showServerSetup = showServerSetup;
@@ -1849,22 +1906,30 @@ function openFormatCards() {
 }
 
 // ── Diagram Generator ──
+let diagramInFlight = false;
+
 async function generateDiagram(type = 'auto') {
+  if (diagramInFlight) { flashCmd('DIAGRAM ALREADY GENERATING'); return; }
   const text = correctionPipeline.correctedText || state.rawTranscript;
   if (!text.trim()) { flashCmd('NOTHING TO DIAGRAM'); return; }
-  const model = $('modelSelect')?.value || aiClient.getSelectedModel();
-  flashCmd('GENERATING DIAGRAM');
-  const diagram = await diagramGenerator.generate(text, model, type);
-  if (diagram) {
-    // Render in the refined pane
-    state.structureView = true;
-    $('refinedLabel').textContent = diagram.label.toUpperCase();
-    $('refinedLabel').classList.add('structured');
-    $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
-    await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
-    flashCmd('DIAGRAM GENERATED');
-  } else {
-    flashCmd('DIAGRAM FAILED');
+  diagramInFlight = true;
+  try {
+    const model = $('modelSelect')?.value || aiClient.getSelectedModel();
+    flashCmd('GENERATING DIAGRAM');
+    const diagram = await diagramGenerator.generate(text, model, type);
+    if (diagram) {
+      // Render in the refined pane
+      state.structureView = true;
+      $('refinedLabel').textContent = diagram.label.toUpperCase();
+      $('refinedLabel').classList.add('structured');
+      $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
+      await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
+      flashCmd('DIAGRAM GENERATED');
+    } else {
+      flashCmd('DIAGRAM FAILED');
+    }
+  } finally {
+    diagramInFlight = false;
   }
 }
 
@@ -1957,6 +2022,7 @@ function init() {
   apiSettingsModal.render();
   apiSettingsModal.onSave = (provider) => {
     const isCloud = provider !== 'ollama';
+    if (!isCloud && state.serverAvailable) saveOllamaUrl(aiClient.getOllamaBaseUrl());
     const switchEl = $('aiModeSwitch');
     if (switchEl) {
       switchEl.querySelectorAll('.ai-mode-btn').forEach(btn => {
@@ -2263,7 +2329,7 @@ function _updateProcessBtn() {
   const btn = $('btnProcess');
   if (!btn) return;
   const isCloud = aiClient.providerConfig && !aiClient.providerConfig.local;
-  btn.style.display = isCloud ? '' : 'none';
+  btn.hidden = !isCloud;
   if (!isCloud) return;
   const wordCount = correctionPipeline.pendingWordCount;
   btn.classList.toggle('btn-process', true);

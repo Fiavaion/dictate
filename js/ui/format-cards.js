@@ -4,7 +4,6 @@
  * Each card shows a formatted output with its own copy button.
  */
 
-let stylesInjected = false;
 
 export class FormatCardsModal {
   /**
@@ -25,7 +24,6 @@ export class FormatCardsModal {
    * @param {object} context  Optional { project, stack }
    */
   async open(text, model, context = {}) {
-    this._injectStyles();
     this._results = {};
     this._activeFormats.clear();
 
@@ -198,146 +196,5 @@ export class FormatCardsModal {
   /** Escape HTML entities. */
   _escHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  /** Inject modal-specific styles once. */
-  _injectStyles() {
-    if (stylesInjected) return;
-    stylesInjected = true;
-
-    const css = document.createElement('style');
-    css.textContent = `
-/* Format Cards Modal */
-.fmt-modal {
-  width: 900px;
-  max-width: 94vw;
-  max-height: 85vh;
-}
-.fmt-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  padding: 16px;
-  overflow-y: auto;
-  max-height: calc(85vh - 60px);
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.fmt-card-grid::-webkit-scrollbar { width: 4px; }
-.fmt-card-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.fmt-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.2s;
-}
-.fmt-card:hover {
-  border-color: var(--muted);
-}
-.fmt-card-loading {
-  border-color: color-mix(in srgb, var(--ai-glow) 40%, var(--border));
-}
-.fmt-card-header {
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ai-glow);
-  padding: 10px 12px 6px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.fmt-card-body {
-  flex: 1;
-  padding: 10px 12px;
-  min-height: 80px;
-  max-height: 200px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.fmt-card-body::-webkit-scrollbar { width: 3px; }
-.fmt-card-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.fmt-card-text {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  line-height: 1.55;
-  color: var(--text);
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-}
-.fmt-card-footer {
-  padding: 6px 12px 8px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-}
-.fmt-copy-btn {
-  font-family: var(--mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--border);
-  padding: 3px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.fmt-copy-btn:hover:not(:disabled) {
-  color: var(--accent2);
-  border-color: var(--accent2);
-}
-.fmt-copy-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.fmt-copied {
-  color: var(--success) !important;
-  border-color: var(--success) !important;
-}
-.fmt-error {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--danger);
-}
-.fmt-waiting {
-  font-family: var(--body);
-  font-size: 0.75rem;
-  color: var(--dim);
-  font-style: italic;
-}
-
-/* Loading spinner */
-.fmt-spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border);
-  border-top-color: var(--ai-glow);
-  border-radius: 50%;
-  animation: fmtSpin 0.7s linear infinite;
-  margin: 20px auto;
-}
-@keyframes fmtSpin {
-  to { transform: rotate(360deg); }
-}
-
-/* Responsive: single column on narrow screens */
-@media (max-width: 640px) {
-  .fmt-card-grid {
-    grid-template-columns: 1fr;
-  }
-  .fmt-modal {
-    max-width: 98vw;
-  }
-}
-    `;
-    document.head.appendChild(css);
   }
 }

@@ -1,0 +1,104 @@
+/* api-settings — loaded statically (moved out of runtime <style> injection for the CSP) */
+
+.ai-settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+.ai-settings-tab {
+  flex: 1;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ai-settings-tab:hover { color: var(--text); }
+.ai-settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.ai-settings-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.ai-settings-input {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ai-settings-input:focus {
+  border-color: var(--ai-glow);
+}
+.ai-settings-key-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ai-settings-eye {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  cursor: pointer;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+}
+.ai-settings-eye:hover { color: var(--text); }
+.ai-settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ai-settings-checkbox-row input[type="checkbox"] {
+  accent-color: var(--ai-glow);
+}
+.ai-settings-model-list {
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+.ai-settings-model-list::-webkit-scrollbar { width: 4px; }
+.ai-settings-model-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.ai-settings-model-item {
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  color: var(--text);
+  border-radius: 4px;
+}
+.ai-settings-model-item:hover {
+  background: var(--elevated);
+}
+.ai-settings-status {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  min-height: 1.2em;
+}

@@ -1,0 +1,158 @@
+/* search-results — loaded statically (moved out of runtime <style> injection for the CSP) */
+
+/* ── Search Modal Controls ── */
+.search-modal-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.search-modal-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-modal-input:focus {
+  border-color: var(--ai-glow);
+}
+.search-modal-input::placeholder {
+  color: var(--dim);
+  font-size: 0.72rem;
+}
+.search-mode-toggle {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.search-mode-btn {
+  padding: 7px 10px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.search-mode-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.search-mode-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+.search-mode-btn:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.search-mode-btn.active {
+  color: var(--ai-glow);
+  border-color: var(--ai-glow);
+  background: color-mix(in srgb, var(--ai-glow) 10%, transparent);
+}
+
+/* ── Status line ── */
+.search-modal-status {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  padding: 4px 16px;
+  min-height: 20px;
+}
+
+/* ── Results ── */
+.search-modal-results {
+  max-height: 340px;
+}
+.search-result-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+.search-result-item:hover {
+  background: color-mix(in srgb, var(--ai-glow) 6%, var(--panel));
+}
+.search-result-item:last-child {
+  border-bottom: none;
+}
+.search-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.search-result-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.search-result-project {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  color: var(--accent2);
+  background: color-mix(in srgb, var(--accent2) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.search-result-meta {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.search-result-match {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 3px 0;
+  word-break: break-word;
+}
+.search-highlight {
+  background: color-mix(in srgb, var(--ai-glow) 25%, transparent);
+  color: var(--ai-glow);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* ── Empty / loading states ── */
+.search-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-family: var(--body);
+  font-size: 0.82rem;
+  color: var(--dim);
+  font-style: italic;
+  text-align: center;
+  padding: 24px;
+}
+.search-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ai-glow);
+  letter-spacing: 0.1em;
+  animation: searchPulse 1.5s ease-in-out infinite;
+}
+@keyframes searchPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
