@@ -48,16 +48,31 @@ function _setProjectsRoot(p) {
 }
 
 // Ollama base URL chosen in AI settings. Stored as an origin; also allowed in the CSP.
+// An origin safe to place in a CSP header: no spaces, ';', ',' or quotes can get through.
+const OLLAMA_ORIGIN = /^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/;
+
 function _ollamaOrigin(value) {
   let url;
   try { url = new URL(value); } catch { return null; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
   if (url.username || url.password) return null;
+  const match = OLLAMA_ORIGIN.exec(url.origin);
+  if (!match) return null;
+  if (match[2] && !(+match[2].slice(1) >= 1 && +match[2].slice(1) <= 65535)) return null;
   return url.origin;
 }
 
+// The saved origin is re-validated on every read; an invalid stored value is dropped.
 function _getOllamaUrl() {
-  return _ollamaOrigin(_loadConfig().ollamaUrl || '');
+  const cfg = _loadConfig();
+  if (cfg.ollamaUrl === undefined) return null;
+  const origin = typeof cfg.ollamaUrl === 'string' ? _ollamaOrigin(cfg.ollamaUrl) : null;
+  if (origin !== cfg.ollamaUrl) {
+    if (origin) cfg.ollamaUrl = origin;
+    else delete cfg.ollamaUrl;
+    _saveConfig(cfg);
+  }
+  return origin;
 }
 
 function _setOllamaUrl(value) {
@@ -620,11 +635,11 @@ function startServer(port, electronApp) {
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, '127.0.0.1', () => {
-      console.log(`FiavaionDictate server listening on http://localhost:${port}`);
+      console.log(`FiavaionDictate server listening on http://localhost:${server.address().port}`);
       resolve(server);
     });
     server.on('error', reject);
   });
 }
 
-module.exports = { startServer };
+module.exports = { startServer, ollamaOrigin: _ollamaOrigin };

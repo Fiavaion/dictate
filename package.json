@@ -7,6 +7,8 @@
   "scripts": {
     "start": "electron .",
     "test": "python evals/smoke-test.py",
+    "test:servers": "node --test tests/server.test.js && python -m unittest discover -s tests -p \"test_*.py\"",
+    "test:renderer": "electron tests/renderer.electron.js",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist": "electron-builder --win --mac"

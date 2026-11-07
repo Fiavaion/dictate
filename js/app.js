@@ -1635,11 +1635,24 @@ $('langSelect').addEventListener('change', () => {
 // origin needs a reload; the session is autosaved and restored, so nothing is lost.
 let ollamaOriginAtLoad = null;
 
+// Same rule as both servers: only a plain http(s) origin (it ends up in the CSP header).
+const OLLAMA_ORIGIN = /^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/;
+
+function toOllamaOrigin(value) {
+  let url;
+  try { url = new URL(value); } catch { return null; }
+  if (url.username || url.password) return null;
+  const match = OLLAMA_ORIGIN.exec(url.origin);
+  if (!match) return null;
+  if (match[2] && !(+match[2].slice(1) >= 1 && +match[2].slice(1) <= 65535)) return null;
+  return url.origin;
+}
+
 async function loadSavedOllamaUrl() {
   try {
     const res = await fetch('/api/ollama-url');
     if (!res.ok) return;
-    const { url } = await res.json();
+    const url = toOllamaOrigin((await res.json()).url);
     ollamaOriginAtLoad = url;
     if (url && url !== aiClient.getOllamaBaseUrl()) {
       aiClient.setOllamaBaseUrl(url);
@@ -1648,7 +1661,9 @@ async function loadSavedOllamaUrl() {
   } catch { /* keep the default URL */ }
 }
 
-async function saveOllamaUrl(url) {
+async function saveOllamaUrl(value) {
+  const url = value ? toOllamaOrigin(value) : null;
+  if (value && !url) { flashCmd('OLLAMA URL NOT SAVED: MUST BE AN HTTP(S) URL'); return; }
   try {
     const res = await fetch('/api/ollama-url', {
       method: 'POST',
@@ -1657,6 +1672,7 @@ async function saveOllamaUrl(url) {
     });
     const data = await res.json();
     if (!res.ok) { flashCmd('OLLAMA URL NOT SAVED: ' + (data.error || res.status)); return; }
+    if (!data.url) return; // cleared: the default local URL needs no reload
     const host = new URL(data.url).hostname;
     const isLocal = host === 'localhost' || host === '127.0.0.1';
     if (!isLocal && data.url !== ollamaOriginAtLoad) window.location.reload();
@@ -1890,22 +1906,30 @@ function openFormatCards() {
 }
 
 // ── Diagram Generator ──
+let diagramInFlight = false;
+
 async function generateDiagram(type = 'auto') {
+  if (diagramInFlight) { flashCmd('DIAGRAM ALREADY GENERATING'); return; }
   const text = correctionPipeline.correctedText || state.rawTranscript;
   if (!text.trim()) { flashCmd('NOTHING TO DIAGRAM'); return; }
-  const model = $('modelSelect')?.value || aiClient.getSelectedModel();
-  flashCmd('GENERATING DIAGRAM');
-  const diagram = await diagramGenerator.generate(text, model, type);
-  if (diagram) {
-    // Render in the refined pane
-    state.structureView = true;
-    $('refinedLabel').textContent = diagram.label.toUpperCase();
-    $('refinedLabel').classList.add('structured');
-    $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
-    await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
-    flashCmd('DIAGRAM GENERATED');
-  } else {
-    flashCmd('DIAGRAM FAILED');
+  diagramInFlight = true;
+  try {
+    const model = $('modelSelect')?.value || aiClient.getSelectedModel();
+    flashCmd('GENERATING DIAGRAM');
+    const diagram = await diagramGenerator.generate(text, model, type);
+    if (diagram) {
+      // Render in the refined pane
+      state.structureView = true;
+      $('refinedLabel').textContent = diagram.label.toUpperCase();
+      $('refinedLabel').classList.add('structured');
+      $('refinedContent').innerHTML = '<div id="diagramContainer"></div>';
+      await diagramRenderer.render(diagram.mermaid, 'diagramContainer');
+      flashCmd('DIAGRAM GENERATED');
+    } else {
+      flashCmd('DIAGRAM FAILED');
+    }
+  } finally {
+    diagramInFlight = false;
   }
 }
 

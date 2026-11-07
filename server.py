@@ -36,7 +36,9 @@ PORT = 31000
 APP_ORIGINS = {f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"}
 ALLOWED_HOSTS = {"localhost", "127.0.0.1"}
 MAX_BODY_BYTES = 4 * 1024 * 1024
-MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# An origin safe to place in a CSP header: no spaces, ';', ',' or quotes can get through.
+OLLAMA_ORIGIN = re.compile(r"https?://([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?")
 STATIC_DIRS = ("js", "css")
 # index.html carries a static meta CSP for GitHub Pages; this server sends the header instead.
 META_CSP = re.compile(r'<meta http-equiv="Content-Security-Policy"[^>]*>\r?\n?')
@@ -83,16 +85,33 @@ def ollama_origin(value):
         return None
     if parts.username or parts.password:
         return None
+    if port is not None and not 1 <= port <= 65535:
+        return None
     host = parts.hostname
     if ":" in host:
         host = f"[{host}]"
     default_port = 80 if parts.scheme == "http" else 443
     suffix = f":{port}" if port and port != default_port else ""
-    return f"{parts.scheme}://{host}{suffix}"
+    origin = f"{parts.scheme}://{host}{suffix}"
+    match = OLLAMA_ORIGIN.fullmatch(origin)
+    if not match or (match.group(2) and not 1 <= int(match.group(2)[1:]) <= 65535):
+        return None
+    return origin
 
 
 def get_ollama_url():
-    return ollama_origin(_load_config().get("ollamaUrl", ""))
+    """The saved Ollama origin, re-validated on every read; an invalid stored value is dropped."""
+    cfg = _load_config()
+    raw = cfg.get("ollamaUrl")
+    if raw is None:
+        return None
+    origin = ollama_origin(raw) if isinstance(raw, str) else None
+    if origin != raw:
+        cfg.pop("ollamaUrl", None)
+        if origin:
+            cfg["ollamaUrl"] = origin
+        _save_config(cfg)
+    return origin
 
 
 def set_ollama_url(value):
@@ -451,6 +470,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # Use HTTP/1.1 so the browser can reuse connections properly
     protocol_version = "HTTP/1.1"
 
+    def __init__(self, *args, **kwargs):
+        # Serve from the app folder regardless of the process working directory.
+        super().__init__(*args, directory=str(APP_ROOT), **kwargs)
+
     def end_headers(self):
         """Add security headers (including the CSP) to every response."""
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -512,8 +535,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _is_static_file(self, path):
         """True only for an existing file inside js/ or css/ (after resolving '..' and links)."""
-        target = pathlib.Path(self.translate_path(path)).resolve()
-        if not target.is_file():
+        try:
+            target = pathlib.Path(self.translate_path(path)).resolve()
+            if not target.is_file():
+                return False
+        except (ValueError, OSError):  # e.g. an embedded null byte (%00)
             return False
         for folder in STATIC_DIRS:
             try:
@@ -700,7 +726,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_error(400, "Invalid request fields")
             return
 
-        if provider == "google" and not MODEL_ID.match(model):
+        if provider == "google" and not MODEL_ID.fullmatch(model):
             self._json_error(400, "Invalid model")
             return
 

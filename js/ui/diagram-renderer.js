@@ -150,6 +150,9 @@ function importSvg(svgMarkup) {
   return { node, css };
 }
 
+let renderQueue = Promise.resolve();
+let renderCount = 0;
+
 export class DiagramRenderer {
   constructor() {
     /** @type {HTMLElement|null} */
@@ -168,7 +171,15 @@ export class DiagramRenderer {
    * @param {string} mermaidSyntax   Valid Mermaid.js code
    * @param {string} containerId     DOM id of the target container
    */
-  async render(mermaidSyntax, containerId) {
+  render(mermaidSyntax, containerId) {
+    // withCssomStyles patches shared prototypes, so renders must never overlap:
+    // each one waits for the previous to finish (whatever its outcome).
+    const run = renderQueue.then(() => this._render(mermaidSyntax, containerId));
+    renderQueue = run.catch(() => {});
+    return run;
+  }
+
+  async _render(mermaidSyntax, containerId) {
     await loadMermaid();
 
     this._container = document.getElementById(containerId) || this._container;
@@ -178,7 +189,7 @@ export class DiagramRenderer {
 
     try {
       // Unique render id to avoid collisions
-      const id = 'mermaid-' + Date.now();
+      const id = `mermaid-${Date.now()}-${++renderCount}`;
       const collected = [];
       const { svg } = await withCssomStyles(
         () => window.mermaid.render(id, mermaidSyntax),
