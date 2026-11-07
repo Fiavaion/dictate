@@ -3,6 +3,7 @@
  * Orchestrates STT, AI correction, prompt structuring, and UI.
  */
 
+import './ui/dom-actions.js';
 import { WebSpeechEngine } from './stt/web-speech-engine.js';
 import { AutoPunctuation } from './stt/auto-punctuation.js';
 import { VocabularyManager } from './stt/vocabulary-manager.js';
@@ -1659,7 +1660,7 @@ function showServerSetup() {
     <div class="folder-modal" style="width:480px">
       <div class="folder-modal-header">
         <span class="folder-modal-title">LOCAL SERVER SETUP</span>
-        <button class="folder-modal-close" onclick="document.getElementById('serverModal').remove()">&times;</button>
+        <button class="folder-modal-close" data-close-modal>&times;</button>
       </div>
       <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
         <p style="font-family:var(--body);font-size:0.82rem;color:var(--text);line-height:1.6">
@@ -1682,10 +1683,11 @@ function showServerSetup() {
         </p>
       </div>
       <div class="folder-modal-footer">
-        <button class="btn-secondary" onclick="document.getElementById('serverModal').remove()">CLOSE</button>
+        <button class="btn-secondary" data-close-modal>CLOSE</button>
       </div>
     </div>
   `;
+  for (const btn of modal.querySelectorAll('[data-close-modal]')) btn.onclick = () => modal.remove();
   document.body.appendChild(modal);
 }
 window.showServerSetup = showServerSetup;

@@ -5,7 +5,9 @@
  * Themed to match FiavaionDictate's dark UI.
  */
 
-const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+// Pinned exact version + Subresource Integrity; electron/server.js allows this exact URL in its CSP.
+const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js';
+const MERMAID_SRI = 'sha384-N3QqR/7q+xm3BGX+CBbNI8AUmRRqcsDzToy+0z1NLDI0QmTKW8zvwLvqulJgk3dP';
 
 let mermaidLoaded = false;
 let mermaidLoadPromise = null;
@@ -22,6 +24,8 @@ async function loadMermaid() {
   mermaidLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = MERMAID_CDN;
+    script.integrity = MERMAID_SRI;
+    script.crossOrigin = 'anonymous';
 
     script.onload = () => {
       window.mermaid.initialize({

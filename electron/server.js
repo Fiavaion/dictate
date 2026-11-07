@@ -287,9 +287,9 @@ async function _proxyRequest(provider, apiKey, model, prompt, systemPrompt, stre
   } else if (provider === 'google') {
     const geminiModel = model || 'gemini-2.5-flash';
     url = new URL(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
     );
-    headers = { 'Content-Type': 'application/json' };
+    headers = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
     bodyStr = JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -388,9 +388,9 @@ async function _listAnthropicModels(apiKey) {
 async function _listGoogleModels(apiKey) {
   const upstream = await _httpsRequest({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    path: '/v1beta/models',
     method: 'GET',
-    headers: {},
+    headers: { 'x-goog-api-key': apiKey },
   }, '');
   const chunks = [];
   upstream.on('data', c => chunks.push(c));
@@ -403,6 +403,27 @@ async function _listGoogleModels(apiKey) {
 // ---------------------------------------------------------------------------
 // Express app
 // ---------------------------------------------------------------------------
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+let _appOrigins = new Set();
+
+// Scripts: own files plus the pinned Mermaid build (js/ui/diagram-renderer.js, loaded with SRI).
+// Styles: 'unsafe-inline' is needed for style="" attributes in the UI templates and the
+// <style> Mermaid embeds in rendered SVGs. Connect: the app's own API plus local Ollama
+// (default port 11434; any localhost port, since the Ollama URL is configurable).
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self' http://localhost:* http://127.0.0.1:*",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
 
 function _buildApp(staticRoot) {
   const app = express();
@@ -423,6 +444,20 @@ function _buildApp(staticRoot) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', CSP);
+    next();
+  });
+
+  // State-changing API calls must come from the app's own origin. Browsers always
+  // send Origin on POST, so a cross-site page is rejected; local non-browser
+  // clients send no Origin and are allowed, as before.
+  app.use('/api', (req, res, next) => {
+    if (SAFE_METHODS.has(req.method)) { next(); return; }
+    const origin = req.get('origin');
+    if (origin !== undefined && !_appOrigins.has(origin)) {
+      res.status(403).json({ error: 'Forbidden origin' });
+      return;
+    }
     next();
   });
 
@@ -518,6 +553,7 @@ function _buildApp(staticRoot) {
 
 function startServer(port, electronApp) {
   _electronApp = electronApp || null;
+  _appOrigins = new Set([`http://localhost:${port}`, `http://127.0.0.1:${port}`]);
   const staticRoot = path.join(__dirname, '..');
   const app = _buildApp(staticRoot);
 

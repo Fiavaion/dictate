@@ -620,9 +620,9 @@ export class AIClient {
     if (!apiKey) return { ok: false, error: 'No API key provided' };
     try {
       const model = this.getSelectedModel('google');
-      const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify(this._buildGeminiBody('Hi', 'Reply with just OK.', { maxTokens: 5, temperature: 0 })),
         signal: AbortSignal.timeout(15000),
       });
@@ -647,9 +647,9 @@ export class AIClient {
     if (!apiKey) throw new Error('No API key for google');
     const timeout = AbortSignal.timeout(options.timeoutMs || 30000);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(this._buildGeminiBody(prompt, systemPrompt, options)),
       signal: combined,
     });
@@ -665,9 +665,9 @@ export class AIClient {
   async _generateFullDirect(model, prompt, systemPrompt, options, signal) {
     const apiKey = this.getApiKey('google');
     if (!apiKey) throw new Error('No API key for google');
-    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(this._buildGeminiBody(prompt, systemPrompt, options)),
       signal,
     });
