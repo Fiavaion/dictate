@@ -52,14 +52,14 @@
     }
   },
   "dependencies": {
-    "express": "^4.22.2"
+    "express": "^4.22.3"
   },
   "devDependencies": {
-    "electron": "^42.0.0",
-    "electron-builder": "^26.0.0"
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22",
     "npm": ">=9.0.0"
   }
 }
