@@ -98,7 +98,7 @@ export class OnboardingWizard {
     overlay.innerHTML = `
       <div class="folder-modal ow-modal" role="dialog" aria-modal="true" aria-labelledby="owTitle">
         <div class="folder-modal-header">
-          <span class="folder-modal-title" id="owTitle" style="color:var(--accent)">SETUP WIZARD</span>
+          <span class="folder-modal-title" id="owTitle">SETUP WIZARD</span>
           <div class="ow-dots" id="owDots"></div>
           <button class="folder-modal-close" id="owClose" aria-label="Close">&times;</button>
         </div>
@@ -109,7 +109,6 @@ export class OnboardingWizard {
     document.body.appendChild(overlay);
     this._el = overlay;
     this._el.querySelector('#owClose').onclick = () => this.close();
-    this._injectStyles();
   }
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -161,7 +160,7 @@ export class OnboardingWizard {
           </svg>
         </div>
         <div class="ow-title">Speak — it types for you</div>
-        <div class="ow-desc" style="margin-bottom:16px">
+        <div class="ow-desc ow-gap-16">
           Talk and your words appear on screen, automatically fixed for spelling and grammar.
           Each sentence is read back aloud so you can hear what you said.
         </div>
@@ -236,7 +235,7 @@ export class OnboardingWizard {
   _step2(body, actions) {
     body.innerHTML = `
       <div class="ow-title">Checking Your System</div>
-      <div class="ow-desc" style="margin-bottom:20px">Checking what's installed on your machine…</div>
+      <div class="ow-desc ow-gap-20">Checking what's installed on your machine…</div>
       <div class="ow-checklist ow-system-list" id="owSysChecks">
         <div class="ow-sys-row" id="owCheckServer">
           <span class="ow-spin"></span>
@@ -334,7 +333,7 @@ export class OnboardingWizard {
       <div class="ow-desc">Ollama is installed and you have ${this._state.ollamaModels.length} model${this._state.ollamaModels.length > 1 ? 's' : ''} available. Choose which one to use for dictation correction:</div>
       <div class="ow-field">
         <label class="ow-label">Active model</label>
-        <select class="ai-settings-input" id="owModelSelect" style="width:100%">${opts}</select>
+        <select class="ai-settings-input" id="owModelSelect">${opts}</select>
       </div>
     `;
     actions.innerHTML = `
@@ -360,9 +359,9 @@ export class OnboardingWizard {
       <div class="ow-desc">Ollama is installed but no AI models are downloaded yet. Choose one to download:</div>
       <div class="ow-field">
         <label class="ow-label">Choose model</label>
-        <select class="ai-settings-input" id="owModelSelect" style="width:100%">${opts}</select>
+        <select class="ai-settings-input" id="owModelSelect">${opts}</select>
       </div>
-      <div class="ow-pull-area" id="owPullArea" style="display:none">
+      <div class="ow-pull-area" id="owPullArea" hidden>
         <div class="ow-progress-bar"><div class="ow-progress-fill" id="owProgressFill"></div></div>
         <div class="ow-pull-status" id="owPullStatus">Starting download…</div>
       </div>
@@ -383,7 +382,7 @@ export class OnboardingWizard {
         <strong>Ollama</strong> is free, open-source software that runs AI on your computer.
         Nothing is sent to the internet — your dictation stays completely private.
       </div>
-      <div class="ow-checklist" style="margin:16px 0">
+      <div class="ow-checklist ow-checklist-spaced">
         <div class="ow-check-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ai-glow)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Free forever — no subscription</span></div>
         <div class="ow-check-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ai-glow)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Works offline — no internet required</span></div>
         <div class="ow-check-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ai-glow)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Private — nothing leaves your machine</span></div>
@@ -393,20 +392,20 @@ export class OnboardingWizard {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         DOWNLOAD OLLAMA (FREE)
       </a>
-      <div class="ow-install-hint" id="owInstallHint" style="display:none">
+      <div class="ow-install-hint" id="owInstallHint" hidden>
         After installing, click <strong>Check Again</strong> below to continue.
       </div>
-      <div class="ow-status" id="owStatus" style="margin-top:12px"></div>
+      <div class="ow-status ow-status-spaced" id="owStatus"></div>
     `;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
-      <div style="display:flex;gap:8px">
+      <div class="ow-btn-row">
         <button class="btn-mic ow-btn-next" id="owCheckAgain"><span>CHECK AGAIN</span></button>
-        <button class="btn-secondary" id="owSkipLocal" style="opacity:0.6">SKIP →</button>
+        <button class="btn-secondary" id="owSkipLocal">SKIP →</button>
       </div>
     `;
     this._el.querySelector('#owOllamaLink').onclick = () => {
-      this._el.querySelector('#owInstallHint').style.display = 'block';
+      this._el.querySelector('#owInstallHint').hidden = false;
     };
     this._el.querySelector('#owBack').onclick = () => this._goTo(2);
     this._el.querySelector('#owSkipLocal').onclick = () => this._goTo(4);
@@ -436,7 +435,7 @@ export class OnboardingWizard {
     const pullArea = this._el?.querySelector('#owPullArea');
     const pullBtn = this._el?.querySelector('#owPullBtn');
     const backBtn = this._el?.querySelector('#owBack');
-    if (pullArea) pullArea.style.display = 'block';
+    if (pullArea) pullArea.hidden = false;
     if (pullBtn) { pullBtn.disabled = true; pullBtn.querySelector('span').textContent = 'DOWNLOADING…'; }
     if (backBtn) backBtn.disabled = true;
     if (sel) sel.disabled = true;
@@ -507,18 +506,18 @@ export class OnboardingWizard {
   _step4(body, actions) {
     const localConfigured = this._state.ollamaAvailable || this._state.ollamaModels.length > 0;
     const githubNote = this._isGitHubPages
-      ? `<div class="ow-info-box">💡 Local AI requires the desktop app. <a href="https://github.com/Fiavaion/dictate" target="_blank" rel="noopener" style="color:var(--accent)">Download here</a> to run it on your machine.</div>`
+      ? `<div class="ow-info-box">💡 Local AI requires the desktop app. <a href="https://github.com/Fiavaion/dictate" target="_blank" rel="noopener" class="ow-link">Download here</a> to run it on your machine.</div>`
       : '';
 
     body.innerHTML = `
       <div class="ow-title">Cloud AI — Optional Upgrade</div>
-      <div class="ow-desc" style="margin-bottom:16px">
+      <div class="ow-desc ow-gap-16">
         ${localConfigured ? 'Your local AI is ready. You can also add a cloud AI for better results.' : 'You can use cloud AI without local setup.'}
       </div>
       ${githubNote}
       <div class="ow-compare">
         <div class="ow-compare-col">
-          <div class="ow-compare-head" style="color:var(--success)">LOCAL AI</div>
+          <div class="ow-compare-head ow-compare-local">LOCAL AI</div>
           <div class="ow-compare-item good">Free forever</div>
           <div class="ow-compare-item good">Completely private</div>
           <div class="ow-compare-item good">Works offline</div>
@@ -528,7 +527,7 @@ export class OnboardingWizard {
         </div>
         <div class="ow-compare-divider"></div>
         <div class="ow-compare-col">
-          <div class="ow-compare-head" style="color:var(--ai-glow)">CLOUD AI</div>
+          <div class="ow-compare-head ow-compare-cloud">CLOUD AI</div>
           <div class="ow-compare-item good">Faster &amp; smarter</div>
           <div class="ow-compare-item good">No GPU required</div>
           <div class="ow-compare-item good">Always up to date</div>
@@ -541,8 +540,8 @@ export class OnboardingWizard {
     const backStep = this._isGitHubPages ? 1 : 3;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn-secondary" id="owSkipCloud" style="font-size:0.68rem">NO THANKS, LOCAL IS FINE</button>
+      <div class="ow-btn-row ow-btn-row-center">
+        <button class="btn-secondary" id="owSkipCloud">NO THANKS, LOCAL IS FINE</button>
         <button class="btn-mic ow-btn-next" id="owNext"><span>SET UP CLOUD AI →</span></button>
       </div>
     `;
@@ -559,7 +558,7 @@ export class OnboardingWizard {
   _step5(body, actions) {
     const cards = CLOUD_PROVIDERS.map(p => `
       <div class="ow-provider-card${p.recommended ? ' ow-provider-recommended' : ''}" data-provider="${p.key}" id="owCard-${p.key}" role="radio" tabindex="0" aria-checked="false">
-        <div class="ow-provider-badge" style="background:color-mix(in srgb,${p.badgeColor} 15%,var(--surface));color:${p.badgeColor}">${p.badge}</div>
+        <div class="ow-provider-badge">${p.badge}</div>
         <div class="ow-provider-name">${p.name}${p.recommended ? '<span class="sr-only"> (recommended)</span>' : ''}</div>
         <div class="ow-provider-by">by ${p.by}</div>
         <div class="ow-provider-desc">${p.desc}</div>
@@ -569,13 +568,19 @@ export class OnboardingWizard {
 
     body.innerHTML = `
       <div class="ow-title">Choose a Cloud Provider</div>
-      <div class="ow-desc" style="margin-bottom:16px">Gemini has a generous free tier — great for most users.</div>
+      <div class="ow-desc ow-gap-16">Gemini has a generous free tier — great for most users.</div>
       <div class="ow-provider-grid" role="radiogroup" aria-label="Cloud provider">${cards}</div>
     `;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
       <button class="btn-mic ow-btn-next" id="owNext" disabled><span>CONTINUE →</span></button>
     `;
+
+    for (const p of CLOUD_PROVIDERS) {
+      const badge = this._el.querySelector(`#owCard-${p.key} .ow-provider-badge`);
+      badge.style.background = `color-mix(in srgb,${p.badgeColor} 15%,var(--surface))`;
+      badge.style.color = p.badgeColor;
+    }
 
     // Pre-select Gemini
     this._state.selectedProvider = 'google';
@@ -617,7 +622,7 @@ export class OnboardingWizard {
     const existing = this.client.getApiKey(p.key) || '';
     body.innerHTML = `
       <div class="ow-title">Connect ${p.name}</div>
-      <div class="ow-desc" style="text-align:left;margin-bottom:16px">
+      <div class="ow-desc ow-gap-16 ow-desc-left">
         <div class="ow-instruction"><span class="gw-num">1</span> Click the button below to open ${p.by}'s API key page</div>
         <div class="ow-instruction"><span class="gw-num">2</span> ${p.key === 'google' ? 'Sign in and click <strong>Create API Key</strong>' : 'Create a new API key'}</div>
         <div class="ow-instruction"><span class="gw-num">3</span> Copy and paste the key below</div>
@@ -626,14 +631,14 @@ export class OnboardingWizard {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         OPEN ${p.by.toUpperCase()} API KEYS
       </a>
-      <div class="ow-field" style="margin-top:16px">
+      <div class="ow-field ow-field-spaced">
         <div class="gw-key-row">
-          <input class="ai-settings-input" id="owApiKey" type="password" value="${escHtml(existing)}" placeholder="${p.keyPlaceholder}" style="flex:1">
+          <input class="ai-settings-input" id="owApiKey" type="password" value="${escHtml(existing)}" placeholder="${p.keyPlaceholder}">
           <button class="ai-settings-eye" id="owEye" title="Show/hide key" aria-label="Show API key" aria-pressed="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
-        <label class="ai-settings-checkbox-row" style="margin-top:8px">
+        <label class="ai-settings-checkbox-row ow-checkbox-spaced">
           <input type="checkbox" id="owRemember" checked>
           <span>Remember key in browser</span>
         </label>
@@ -642,8 +647,8 @@ export class OnboardingWizard {
     `;
     actions.innerHTML = `
       <button class="btn-secondary ow-btn-back" id="owBack">← BACK</button>
-      <div style="display:flex;gap:8px">
-        <button class="btn-secondary" id="owSkipKey" style="opacity:0.6;font-size:0.68rem">SKIP FOR NOW</button>
+      <div class="ow-btn-row">
+        <button class="btn-secondary" id="owSkipKey">SKIP FOR NOW</button>
         <button class="btn-mic ow-btn-next" id="owTestBtn"><span>TEST &amp; CONTINUE →</span></button>
       </div>
     `;
@@ -718,16 +723,16 @@ export class OnboardingWizard {
         </svg>
       </div>
       <div class="ow-title">You're All Set!</div>
-      <div class="ow-desc" style="margin-bottom:20px">Here's what's configured:</div>
+      <div class="ow-desc ow-gap-20">Here's what's configured:</div>
       <div class="ow-summary">
         ${localLine}
         ${cloudLine}
       </div>
-      <div class="ow-desc" style="margin-top:16px;font-size:0.75rem">
+      <div class="ow-desc ow-note">
         Click the mic button and start talking. Your dictation will be automatically cleaned up by AI.
       </div>
-      <div class="ow-desc" style="margin-top:10px;font-size:0.75rem;color:var(--accent2)">
-        <strong style="color:var(--accent2)">Tip:</strong> Click <strong>READ BACK</strong> in the toolbar to have each sentence read aloud as you dictate — so you can hear exactly what was written.
+      <div class="ow-desc ow-tip">
+        <strong class="ow-tip-label">Tip:</strong> Click <strong>READ BACK</strong> in the toolbar to have each sentence read aloud as you dictate — so you can hear exactly what was written.
       </div>
     `;
     actions.innerHTML = `
@@ -752,198 +757,5 @@ export class OnboardingWizard {
     if (!el) return;
     el.textContent = text;
     el.style.color = color || 'var(--muted)';
-  }
-
-  // ── Styles ───────────────────────────────────────────────────────────────────
-
-  _injectStyles() {
-    if (document.getElementById('onboarding-wizard-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'onboarding-wizard-styles';
-    style.textContent = `
-      .ow-modal { max-width: 500px; width: 100%; display: flex; flex-direction: column; }
-      .ow-body {
-        padding: 24px 24px 12px;
-        min-height: 260px;
-        display: flex; flex-direction: column; align-items: center;
-        overflow-y: auto; max-height: 60vh;
-      }
-      .ow-actions {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 20px; border-top: 1px solid var(--border);
-        flex-shrink: 0;
-      }
-      .ow-title {
-        font-family: var(--display); font-size: 1.2rem;
-        color: var(--text); margin-bottom: 10px; text-align: center;
-      }
-      .ow-desc {
-        font-family: var(--body); font-size: 0.82rem;
-        color: var(--muted); line-height: 1.7; text-align: center; max-width: 420px;
-      }
-      .ow-desc strong { color: var(--text); }
-      .ow-hero { margin-bottom: 16px; }
-      .ow-icon-success { margin-bottom: 12px; }
-      .ow-dots { display: flex; gap: 6px; align-items: center; }
-      .ow-dot {
-        width: 7px; height: 7px; border-radius: 50%;
-        background: var(--border); transition: all 0.3s;
-      }
-      .ow-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-      .ow-dot.done { background: var(--success); }
-      .ow-btn-next { padding: 8px 20px !important; font-size: 0.73rem !important; }
-      .ow-btn-back { padding: 6px 14px; font-size: 0.7rem; }
-      .ow-checklist {
-        display: flex; flex-direction: column; gap: 8px;
-        align-items: flex-start; margin-top: 12px; width: 100%; max-width: 360px;
-      }
-      .ow-check-item {
-        display: flex; align-items: center; gap: 8px;
-        font-family: var(--body); font-size: 0.8rem; color: var(--text);
-      }
-      .ow-system-list { width: 100%; max-width: 380px; gap: 10px; }
-      .ow-sys-row {
-        display: flex; align-items: center; gap: 10px;
-        font-family: var(--body); font-size: 0.82rem; color: var(--text);
-        background: var(--surface); border-radius: 6px; padding: 10px 14px;
-        width: 100%;
-      }
-      .ow-sys-result { margin-left: auto; color: var(--muted); font-size: 0.75rem; }
-      @keyframes ow-spin { to { transform: rotate(360deg); } }
-      .ow-spin {
-        display: inline-block; width: 14px; height: 14px;
-        border: 2px solid var(--border); border-top-color: var(--accent);
-        border-radius: 50%; animation: ow-spin 0.7s linear infinite; flex-shrink: 0;
-      }
-      .ow-field { width: 100%; max-width: 380px; margin-top: 12px; }
-      .ow-label { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); display: block; margin-bottom: 4px; letter-spacing: 0.06em; }
-      .ow-status {
-        font-family: var(--mono); font-size: 0.72rem; min-height: 1.2em;
-        margin-top: 10px; text-align: center;
-      }
-      .ow-pull-area { width: 100%; max-width: 380px; margin-top: 14px; }
-      .ow-progress-bar {
-        height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden;
-      }
-      .ow-progress-fill {
-        height: 100%; width: 0; background: var(--accent);
-        border-radius: 3px; transition: width 0.3s;
-      }
-      .ow-pull-status {
-        font-family: var(--mono); font-size: 0.7rem;
-        color: var(--muted); margin-top: 6px; text-align: center;
-      }
-      .ow-link-btn {
-        display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
-        padding: 10px 20px;
-        background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-        border: 1px solid var(--accent); border-radius: 6px;
-        color: var(--accent); font-family: var(--mono); font-size: 0.72rem;
-        letter-spacing: 0.08em; text-decoration: none; transition: all 0.2s;
-      }
-      .ow-link-btn:hover {
-        background: color-mix(in srgb, var(--accent) 20%, var(--surface));
-        box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 20%, transparent);
-      }
-      .ow-install-hint {
-        margin-top: 14px;
-        padding: 10px 14px;
-        background: color-mix(in srgb, var(--success) 10%, var(--surface));
-        border: 1px solid var(--success);
-        border-radius: 6px;
-        font-family: var(--body);
-        font-size: 0.8rem;
-        color: var(--text);
-        text-align: center;
-        max-width: 340px;
-      }
-      .ow-install-hint strong { color: var(--success); }
-      .ow-info-box {
-        background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-        border-radius: 6px; padding: 10px 14px;
-        font-family: var(--body); font-size: 0.78rem; color: var(--muted);
-        width: 100%; max-width: 420px; margin-bottom: 12px; line-height: 1.5;
-      }
-      .ow-compare {
-        display: flex; gap: 0; width: 100%; max-width: 420px;
-        background: var(--surface); border-radius: 8px; overflow: hidden;
-        border: 1px solid var(--border);
-      }
-      .ow-compare-col { flex: 1; padding: 14px 12px; }
-      .ow-compare-head {
-        font-family: var(--mono); font-size: 0.68rem; font-weight: 700;
-        letter-spacing: 0.1em; margin-bottom: 10px;
-      }
-      .ow-compare-divider { width: 1px; background: var(--border); }
-      .ow-compare-item {
-        font-family: var(--body); font-size: 0.75rem; padding: 3px 0;
-        display: flex; align-items: center; gap: 5px; line-height: 1.4;
-      }
-      .ow-compare-item.good { color: var(--text); }
-      .ow-compare-item.good::before { content: '✓'; color: var(--success); font-size: 0.7rem; }
-      .ow-compare-item.bad { color: var(--muted); }
-      .ow-compare-item.bad::before { content: '✗'; color: var(--danger); font-size: 0.7rem; }
-      .ow-provider-grid {
-        display: flex; gap: 10px; width: 100%; max-width: 440px;
-      }
-      .ow-provider-card {
-        flex: 1; padding: 14px 10px; background: var(--surface);
-        border: 2px solid var(--border); border-radius: 8px;
-        cursor: pointer; transition: all 0.2s; text-align: center;
-        position: relative;
-      }
-      .ow-provider-card:hover { border-color: var(--muted); }
-      .ow-provider-card.selected {
-        border-color: var(--accent);
-        background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-        box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
-      }
-      .ow-provider-recommended::after {
-        content: '★ RECOMMENDED';
-        position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
-        background: var(--accent); color: var(--bg);
-        font-family: var(--mono); font-size: 0.55rem; font-weight: 700;
-        padding: 2px 7px; border-radius: 20px; white-space: nowrap;
-      }
-      .ow-provider-badge {
-        font-family: var(--mono); font-size: 0.58rem; font-weight: 700;
-        padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 6px;
-      }
-      .ow-provider-name {
-        font-family: var(--display); font-size: 0.95rem; color: var(--text);
-        margin-bottom: 2px;
-      }
-      .ow-provider-by {
-        font-family: var(--body); font-size: 0.68rem; color: var(--muted); margin-bottom: 8px;
-      }
-      .ow-provider-desc {
-        font-family: var(--body); font-size: 0.72rem; color: var(--text); line-height: 1.4;
-        margin-bottom: 6px;
-      }
-      .ow-provider-detail {
-        font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
-      }
-      .ow-summary {
-        display: flex; flex-direction: column; gap: 8px;
-        width: 100%; max-width: 380px;
-      }
-      .ow-summary-row {
-        display: flex; align-items: flex-start; gap: 8px;
-        font-family: var(--body); font-size: 0.82rem;
-        background: var(--surface); border-radius: 6px; padding: 10px 14px;
-      }
-      .ow-summary-row.good { color: var(--text); border-left: 3px solid var(--success); }
-      .ow-summary-row.muted { color: var(--muted); border-left: 3px solid var(--border); }
-      .ow-summary-row strong { color: var(--text); }
-      .gw-key-row { display: flex; gap: 6px; align-items: center; width: 100%; }
-      .ow-instruction {
-        display: flex; align-items: center; gap: 10px;
-        padding: 7px 0; font-size: 0.8rem; color: var(--text);
-        font-family: var(--body); width: 100%;
-      }
-      .ow-instruction strong { color: var(--ai-glow); }
-    `;
-    document.head.appendChild(style);
   }
 }

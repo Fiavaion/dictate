@@ -20,7 +20,6 @@ export class ConfidenceHeatmap {
     this.enabled = false;
     /** Callback fired when user picks an alternative: (segmentIdx, newWord) => void */
     this.onWordOverride = null;
-    this._stylesInjected = false;
     this._clickContainer = null;
   }
 
@@ -55,7 +54,6 @@ export class ConfidenceHeatmap {
   renderHtml() {
     if (!this.enabled || this.segments.length === 0) return null;
 
-    this._injectStyles();
 
     return this.segments.map((seg, idx) => {
       const cls = this._confidenceClass(seg.confidence);
@@ -255,112 +253,5 @@ export class ConfidenceHeatmap {
 
     document.body.appendChild(tip);
     setTimeout(() => tip.remove(), 2000);
-  }
-
-  /**
-   * Inject styles for confidence heatmap + alternatives dropdown.
-   * Uses the project's CSS variable design system.
-   */
-  _injectStyles() {
-    if (this._stylesInjected) return;
-    if (document.getElementById('confidence-heatmap-styles')) {
-      this._stylesInjected = true;
-      return;
-    }
-
-    const style = document.createElement('style');
-    style.id = 'confidence-heatmap-styles';
-    style.textContent = `
-      /* ── Confidence Heatmap Spans ── */
-      .confidence-word {
-        transition: background 0.2s, box-shadow 0.2s;
-        border-radius: 2px;
-        padding: 0 1px;
-      }
-      .confidence-high {
-        /* No highlight — text looks normal */
-      }
-      .confidence-medium {
-        background: color-mix(in srgb, var(--warning) 12%, transparent);
-        color: color-mix(in srgb, var(--warning) 40%, var(--text));
-      }
-      .confidence-low {
-        background: color-mix(in srgb, var(--warning) 22%, transparent);
-        color: var(--warning);
-        box-shadow: 0 0 6px color-mix(in srgb, var(--warning) 15%, transparent);
-      }
-      .confidence-very-low {
-        background: color-mix(in srgb, var(--danger) 20%, transparent);
-        color: var(--danger);
-        box-shadow: 0 0 8px color-mix(in srgb, var(--danger) 20%, transparent);
-        text-decoration: underline wavy color-mix(in srgb, var(--danger) 40%, transparent);
-        text-underline-offset: 3px;
-      }
-      .confidence-clickable {
-        cursor: pointer;
-      }
-      .confidence-clickable:hover {
-        filter: brightness(1.2);
-        box-shadow: 0 0 10px color-mix(in srgb, var(--warning) 30%, transparent);
-      }
-
-      /* ── Alternatives Dropdown ── */
-      .word-alternatives {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 4px 0;
-        min-width: 140px;
-        max-width: 280px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        animation: altsFadeIn 0.12s ease-out;
-      }
-      @keyframes altsFadeIn {
-        from { opacity: 0; transform: translateY(-4px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
-      .word-alternatives-header {
-        font-family: var(--mono);
-        font-size: 0.55rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--dim);
-        padding: 4px 10px 6px;
-        border-bottom: 1px solid var(--border);
-      }
-      .alt-option {
-        display: block;
-        width: 100%;
-        padding: 6px 10px;
-        background: none;
-        border: none;
-        color: var(--text);
-        font-family: var(--mono);
-        font-size: 0.78rem;
-        text-align: left;
-        cursor: pointer;
-        transition: all 0.12s;
-      }
-      .alt-option:hover {
-        background: var(--elevated);
-        color: var(--accent2);
-      }
-
-      /* ── No-alts tooltip ── */
-      .word-no-alts-tooltip {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 6px 10px;
-        font-family: var(--mono);
-        font-size: 0.65rem;
-        color: var(--dim);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        animation: altsFadeIn 0.12s ease-out;
-        pointer-events: none;
-      }
-    `;
-    document.head.appendChild(style);
-    this._stylesInjected = true;
   }
 }

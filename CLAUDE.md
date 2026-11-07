@@ -43,6 +43,8 @@ GitHub Pages static mode.
 - `GET /api/projects-root` — get projects folder path
 - `POST /api/projects-root` — set projects folder (saves to config.json)
 - `GET /api/browse?path=...` — list subdirectories for folder browser
+- `GET /api/ollama-url` / `POST /api/ollama-url` — get/set the saved Ollama origin (config.json); the server adds it to the CSP `connect-src`
+- Both servers send the Content-Security-Policy header (no inline scripts or styles: use `css/` files, `js/` files, `data-click` attributes, or CSSOM); `index.html` carries a meta CSP for GitHub Pages that the servers strip
 
 # Git / Deploy
 - Remote: `origin` → `https://github.com/Fiavaion/dictate.git`
